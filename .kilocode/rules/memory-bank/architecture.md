@@ -1,120 +1,74 @@
-# System Patterns: Next.js Starter Template
+# System Patterns: Staffroom Intel
 
 ## Architecture Overview
 
 ```
 src/
-├── app/                    # Next.js App Router
-│   ├── layout.tsx          # Root layout + metadata
-│   ├── page.tsx            # Home page
-│   ├── globals.css         # Tailwind imports + global styles
-│   └── favicon.ico         # Site icon
-└── (expand as needed)
-    ├── components/         # React components (add when needed)
-    ├── lib/                # Utilities and helpers (add when needed)
-    └── db/                 # Database files (add via recipe)
+├── app/                        # Next.js App Router
+│   ├── layout.tsx              # Root layout + SiteNav
+│   ├── page.tsx                # Home: paste-a-link flow
+│   ├── school/[slug]/page.tsx  # Per-school report (server)
+│   ├── schools/page.tsx        # Browse by region (server)
+│   ├── purchasing-power/page.tsx
+│   ├── about/page.tsx
+│   ├── not-found.tsx
+│   └── api/
+│       ├── analyze/            # POST job URL → ParsedJob
+│       ├── schools/            # GET search schools
+│       ├── sentiment/          # POST school → Reddit + fallback
+│       └── purchasing-power/   # GET city COL data
+├── components/                 # React components
+│   ├── PasteLink.tsx           # Client: paste + manual fallback
+│   ├── PurchasingPowerTool.tsx # Client: COL calculator
+│   ├── SentimentPanel.tsx      # Client: fetches live sentiment
+│   ├── charts.tsx              # Histogram + StatBar
+│   ├── icons.tsx
+│   └── SiteNav.tsx
+└── lib/
+    ├── types.ts                # Monthly-USD data model
+    ├── data/                   # Data layer (static → future SQL)
+    ├── analysis/               # Verdict + sentiment engines
+    ├── reddit/client.ts        # Real Reddit OAuth API
+    ├── parser/jobLink.ts       # Job URL + salary parser
+    └── tone.ts
 ```
 
 ## Key Design Patterns
 
-### 1. App Router Pattern
+### 1. Data Layer (Static → SQL migration path)
+- Salary data stored as a TSV constant (`salaryRaw.ts`), parsed once at runtime into `SalaryRecord[]`
+- Schools are **derived** from salary records (no separate school table) — this will map cleanly to SQL tables later
+- All salaries normalized to **monthly USD** with a `netMonthlyUsd` field (gross × (1 − taxRate))
+- COL data is a static array; `colNearest()` falls back country-level when a city isn't found
 
-Uses Next.js App Router with file-based routing:
-```
-src/app/
-├── page.tsx           # Route: /
-├── about/page.tsx     # Route: /about
-├── blog/
-│   ├── page.tsx       # Route: /blog
-│   └── [slug]/page.tsx # Route: /blog/:slug
-└── api/
-    └── route.ts       # API Route: /api
-```
+### 2. Salary Verdict Engine (`analysis/salary.ts`)
+`buildSalaryReport(schoolId, job?)` returns:
+- School/country/region stats (min, max, median, p25, p75, mean)
+- Offer analysis: percentile vs country & region, net take-home, living cost, savings rate, buying power, verdict tier
+- Verdict tiers: Strong offer / Competitive / Fair / Below market (driven by percentile + savings rate)
 
-### 2. Component Organization Pattern (When Expanding)
+### 3. Reddit Sentiment (Live + Fallback)
+- **Live**: `reddit/client.ts` uses OAuth `client_credentials`, versioned user-agent, token caching, rate-limit aware
+- **Fallback**: `/api/sentiment` falls back to curated static posts (`data/sentiment.ts`) when Reddit has no results or credentials unset
+- `SentimentPanel` (client) fetches and shows provenance badge (live / fallback / offline)
+- Future: scraper writes to SQL DB; Reddit becomes confirmation layer
 
-```
-src/components/
-├── ui/                # Reusable UI components (Button, Card, etc.)
-├── layout/            # Layout components (Header, Footer)
-├── sections/          # Page sections (Hero, Features, etc.)
-└── forms/             # Form components
-```
+### 4. Server Components by Default
+- Data-heavy pages (school report, browse, purchasing power shell) are Server Components
+- Only interactive pieces (`PasteLink`, `PurchasingPowerTool`, `SentimentPanel`) are Client Components
 
-### 3. Server Components by Default
-
-All components are Server Components unless marked with `"use client"`:
-```tsx
-// Server Component (default) - can fetch data, access DB
-export default function Page() {
-  return <div>Server rendered</div>;
-}
-
-// Client Component - for interactivity
-"use client";
-export default function Counter() {
-  const [count, setCount] = useState(0);
-  return <button onClick={() => setCount(c => c + 1)}>{count}</button>;
-}
-```
-
-### 4. Layout Pattern
-
-Layouts wrap pages and can be nested:
-```tsx
-// src/app/layout.tsx - Root layout
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
-}
-
-// src/app/dashboard/layout.tsx - Nested layout
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex">
-      <Sidebar />
-      <main>{children}</main>
-    </div>
-  );
-}
-```
+### 5. Job Parser (`parser/jobLink.ts`)
+- Source detection (regex per jobsite)
+- Fuzzy school matching (token overlap + city match against derived schools)
+- Salary extraction → currency detection → annual/monthly inference → FX to monthly USD
 
 ## Styling Conventions
-
-### Tailwind CSS Usage
-- Utility classes directly on elements
-- Component composition for repeated patterns
-- Responsive: `sm:`, `md:`, `lg:`, `xl:`
-
-### Common Patterns
-```tsx
-// Container
-<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
-// Responsive grid
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-// Flexbox centering
-<div className="flex items-center justify-center">
-```
-
-## File Naming Conventions
-
-- Components: PascalCase (`Button.tsx`, `Header.tsx`)
-- Utilities: camelCase (`utils.ts`, `helpers.ts`)
-- Pages/Routes: lowercase (`page.tsx`, `layout.tsx`)
-- Directories: kebab-case (`api-routes/`) or lowercase (`components/`)
+- Dark theme (`#07090f` background), Tailwind CSS 4
+- Glassmorphism cards: `border-white/10 bg-white/[0.03]`
+- Gradient accents: indigo → fuchsia
+- Tone system (`tone.ts`): good=emerald, warn=amber, bad=rose
 
 ## State Management
-
-For simple needs:
-- `useState` for local component state
-- `useContext` for shared state
-- Server Components for data fetching
-
-For complex needs (add when necessary):
-- Zustand for client state
-- React Query for server state
+- `useState` for local client state (salary slider, search query)
+- Server Components for all data fetching and report building
+- No global state library needed yet

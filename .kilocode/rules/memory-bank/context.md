@@ -1,87 +1,83 @@
-# Active Context: Next.js Starter Template
+# Active Context: Staffroom Intel
 
 ## Current State
 
-**Template Status**: ✅ Ready for development
+**App Status**: ✅ MVP built and deployed
 
-The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. It's ready for AI-assisted expansion to build any type of application.
+Staffroom Intel is an international teacher job-intelligence tool. A teacher pastes a job link and instantly sees how the salary compares to real verified data, what their purchasing power/savings look like, and what teachers say about the school.
 
-## Recently Completed
+## What's Built
 
-- [x] Base Next.js 16 setup with App Router
-- [x] TypeScript configuration with strict mode
-- [x] Tailwind CSS 4 integration
-- [x] ESLint configuration
-- [x] Memory bank documentation
-- [x] Recipe system for common features
+### Core Features
+- **Paste-and-analyze flow** (`/`): paste a jobsite URL → parser extracts school, role, salary → routes to school report
+- **Job-board parser** (`src/lib/parser/jobLink.ts`): detects source (tes/grc/teacherhorizons/schrole/eslcafe), matches school via fuzzy token matching, extracts salary → normalizes to monthly USD (handles annual/monthly + currency FX)
+- **Salary verdict engine** (`src/lib/analysis/salary.ts`): percentile vs country & region, net take-home, monthly savings, savings rate, COL-adjusted buying power, 4-tier verdict
+- **Purchasing power tool** (`/purchasing-power`): salary slider, 2-city comparator, ranked leaderboard, everyday prices (milk/beer/meal/takeaway/gym/taxi)
+- **Reddit sentiment** (live + fallback): real OAuth Reddit client with graceful static fallback
+- **Schools browse** (`/schools`): grouped by region, median salary per school
+- **Per-school report** (`/school/[slug]`): verdict header, distribution histogram, percentile bars, salary records table, COL card, sentiment panel
 
-## Current Structure
+### Data Layer
+- **619 real salary records** across **551 schools**, **111 countries** (TSV → parsed at runtime in `src/lib/data/salaryRaw.ts` + `schools.ts`)
+- Salaries normalized to **monthly USD** (net = gross × (1 − taxRate))
+- **60 cities** cost-of-living data (COL index vs London=100, buying power, 6 granular price items)
+- Schools derived dynamically from salary records (slug = normalized school+city+country)
 
-| File/Directory | Purpose | Status |
-|----------------|---------|--------|
-| `src/app/page.tsx` | Home page | ✅ Ready |
-| `src/app/layout.tsx` | Root layout | ✅ Ready |
-| `src/app/globals.css` | Global styles | ✅ Ready |
-| `.kilocode/` | AI context & recipes | ✅ Ready |
+## Architecture Notes
 
-## Current Focus
+### Reddit Integration
+- Client: `src/lib/reddit/client.ts` — OAuth `client_credentials` grant, versioned user-agent (`staffroom-intel/1.0.0`), token caching, rate-limit awareness (429 handling), 8s timeouts
+- **Env vars needed**: `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` (not yet set → falls back to static sentiment)
+- API route `/api/sentiment` returns live posts or falls back to curated static set (`src/lib/data/sentiment.ts`)
 
-The template is ready. Next steps depend on user requirements:
+### Planned (per user direction)
+- Background scraper → SQL DB as primary source, Reddit as confirmation layer
+- Anonymous salary submission to grow dataset
+- Glassdoor/Facebook signals via cached community content
 
-1. What type of application to build
-2. What features are needed
-3. Design/branding preferences
+## File Structure
 
-## Quick Start Guide
-
-### To add a new page:
-
-Create a file at `src/app/[route]/page.tsx`:
-```tsx
-export default function NewPage() {
-  return <div>New page content</div>;
-}
 ```
-
-### To add components:
-
-Create `src/components/` directory and add components:
-```tsx
-// src/components/ui/Button.tsx
-export function Button({ children }: { children: React.ReactNode }) {
-  return <button className="px-4 py-2 bg-blue-600 text-white rounded">{children}</button>;
-}
+src/
+├── app/
+│   ├── page.tsx                  # Home (paste flow)
+│   ├── school/[slug]/page.tsx    # School report
+│   ├── schools/page.tsx          # Browse by region
+│   ├── purchasing-power/page.tsx # COL tool
+│   ├── about/page.tsx
+│   ├── not-found.tsx
+│   └── api/
+│       ├── analyze/route.ts      # POST job URL → parsed
+│       ├── schools/route.ts      # GET search
+│       ├── sentiment/route.ts    # POST school → Reddit + fallback
+│       └── purchasing-power/route.ts
+├── components/
+│   ├── PasteLink.tsx             # Client: paste flow + manual search
+│   ├── PurchasingPowerTool.tsx   # Client: COL calculator
+│   ├── SentimentPanel.tsx        # Client: fetches live sentiment
+│   ├── charts.tsx                # Histogram + StatBar
+│   ├── icons.tsx                 # Source icons
+│   └── SiteNav.tsx
+└── lib/
+    ├── types.ts                  # Monthly-USD data model
+    ├── data/
+    │   ├── salaryRaw.ts          # 619-row TSV constant
+    │   ├── schools.ts            # TSV parser + school derivation
+    │   ├── costOfLiving.ts       # 60 cities + purchasing power
+    │   ├── sentiment.ts          # Static fallback posts
+    │   └── geo.ts                # Country→region/code maps
+    ├── analysis/
+    │   ├── finance.ts            # stats, percentiles, histogram, formatUsd
+    │   ├── salary.ts             # buildSalaryReport + verdict
+    │   └── sentiment.ts          # buildSentimentReport
+    ├── reddit/client.ts          # Real Reddit OAuth API
+    ├── parser/jobLink.ts         # Job URL + salary parser
+    └── tone.ts                   # Verdict/sentiment color tones
 ```
-
-### To add a database:
-
-Follow `.kilocode/recipes/add-database.md`
-
-### To add API routes:
-
-Create `src/app/api/[route]/route.ts`:
-```tsx
-import { NextResponse } from "next/server";
-
-export async function GET() {
-  return NextResponse.json({ message: "Hello" });
-}
-```
-
-## Available Recipes
-
-| Recipe | File | Use Case |
-|--------|------|----------|
-| Add Database | `.kilocode/recipes/add-database.md` | Data persistence with Drizzle + SQLite |
-
-## Pending Improvements
-
-- [ ] Add more recipes (auth, email, etc.)
-- [ ] Add example components
-- [ ] Add testing setup recipe
 
 ## Session History
 
 | Date | Changes |
 |------|---------|
 | Initial | Template created with base setup |
+| 2026-07-09 | Built Staffroom Intel MVP: real 619-record salary dataset, job-link parser, salary verdict engine, purchasing power tool, live Reddit sentiment with fallback, browse + report pages |

@@ -1,48 +1,50 @@
-# Project Brief: Next.js Starter Template
+# Project Brief: Staffroom Intel
 
 ## Purpose
 
-This is a minimal Next.js starter template designed for AI-assisted development. It provides a clean foundation that can be extended to build any type of web application through interaction with an AI assistant.
+A tool that helps international school teachers evaluate job offers with real data instead of marketing language. A teacher pastes a job link (from tes.com, Teacher Horizons, Search Associates/GRC, Schrole, etc.) and gets an aggregated overview of: how the salary compares to what's already known, what the purchasing power/savings look like, and what the social sentiment about the school is.
+
+Inspired by mystool.org (salary intelligence) and Wondering Staffroom (community salary tracker) but with a better experience: paste-a-link → instant verdict, cost-of-living-adjusted purchasing power, and live social sentiment.
 
 ## Target Users
 
-- Developers wanting a clean Next.js starting point
-- Users building applications through AI-assisted coding
-- Teams needing a standardized, modern Next.js setup
+- International school teachers evaluating job offers
+- Teachers comparing packages across countries/schools
+- Early-career teachers judging whether a first-contract salary is realistic
+- Teachers weighing overseas packages against home-country salaries
 
-## Core Use Case
+## Core Use Cases
 
-Users describe what they want to build to an AI assistant, which then expands this template by:
-
-1. Adding components and pages as needed
-2. Installing additional dependencies
-3. Setting up databases, authentication, etc. using recipes
-4. Customizing styling and branding
+1. **Paste a job link** → instant salary verdict, purchasing power, and sentiment
+2. **Compare purchasing power** across cities for a given salary
+3. **Browse schools** by region to see real salary distributions
+4. **Read teacher sentiment** about a specific school
 
 ## Key Requirements
 
 ### Must Have
+- Job-link parser supporting tes.com, Teacher Horizons, Search Associates, Schrole
+- Salary comparison against real verified data (percentiles, not just median)
+- Cost-of-living-adjusted purchasing power and savings estimate
+- Reddit sentiment (live API with fallback)
+- Monthly-USD normalization across all currencies/tax regimes
 
-- Modern Next.js 16 setup with App Router
-- TypeScript for type safety
-- Tailwind CSS 4 for styling
-- ESLint for code quality
-- Clean, minimal starting structure
-- Bun as package manager
-
-### Nice to Have
-
-- Recipe system for common additions (database, auth)
-- Memory bank for AI context persistence
-- Clear development guidelines
-
-## Success Metrics
-
-- Clean, zero-error TypeScript setup
-- Passing lint and type checks
+### Planned / Nice to Have
+- Background scraper → SQL database as primary data source
+- Reddit API as confirmation/refresh layer on top of cached DB
+- Anonymous salary submission to grow dataset
+- Glassdoor/Facebook/Instagram signals via cached community content
+- Granular cost-of-living items (milk, beer, meal, gym, taxi) — DONE
 
 ## Constraints
 
-- Minimal dependencies by default
 - Framework: Next.js 16 + React 19 + Tailwind CSS 4
 - Package manager: Bun
+- Reddit API: free tier (~100 requests / 10 min) is sufficient for per-school lookups
+- Salary data is self-reported/indicative — must disclaim this
+
+## Success Metrics
+
+- Real salary dataset that rivals competitors (mystool's 700 verified salaries)
+- Instant, actionable verdict on any pasted offer
+- Clear purchasing-power comparison so teachers understand real value
