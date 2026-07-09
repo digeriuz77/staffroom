@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { SparkIcon } from "@/components/icons";
+import { AuthButton } from "@/components/AuthButton";
+import { CurrencyPicker } from "@/components/CurrencyProvider";
 
 export function SiteNav() {
   return (
@@ -16,7 +18,12 @@ export function SiteNav() {
         <div className="flex items-center gap-1 text-sm">
           <NavLink href="/schools">Schools</NavLink>
           <NavLink href="/purchasing-power">Purchasing Power</NavLink>
+          <NavLink href="/submit">Contribute</NavLink>
           <NavLink href="/about">About</NavLink>
+          <div className="ml-2 flex items-center gap-2">
+            <CurrencyPicker />
+            <AuthButton />
+          </div>
         </div>
       </nav>
     </header>

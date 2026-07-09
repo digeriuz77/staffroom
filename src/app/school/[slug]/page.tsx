@@ -4,6 +4,7 @@ import { getDerivedSchool } from "@/lib/data/schools";
 import { buildSalaryReport, formatUsd } from "@/lib/analysis/salary";
 import { Histogram, StatBar } from "@/components/charts";
 import { SentimentPanel } from "@/components/SentimentPanel";
+import { TanePanel } from "@/components/TanePanel";
 import { ArrowIcon } from "@/components/icons";
 import { verdictTone, sentimentTone, TONE_CLASSES, pct } from "@/lib/tone";
 import type { Metadata } from "next";
@@ -125,6 +126,8 @@ export default async function SchoolReport({ params, searchParams }: {
               ))}
             </div>
           </section>
+
+          <TanePanel slug={school.slug} offerMonthlyUsd={offerAnalysis?.offeredMonthlyUsd} />
         </div>
 
         <div className="space-y-6 lg:col-span-2">

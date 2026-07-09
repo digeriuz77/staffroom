@@ -162,13 +162,13 @@ Depends on: Area 1 (jobs table).
 
 | Area | Status |
 |------|--------|
-| 1 Foundation (Supabase + Auth + Migration) | Not started |
-| 2 Household + TANE | Not started |
-| 3 Bounty / Self-report | Not started |
-| 4 Semantic analysis (pgvector) | Not started |
-| 5 Turnover estimation | Not started |
-| 6 Currency parity | Not started |
-| 7 Background ops (Railway) | Not started |
+| 1 Foundation (Supabase + Auth + Migration) | Done |
+| 2 Household + TANE | Done |
+| 3 Bounty / Self-report | Done |
+| 4 Semantic analysis (pgvector) | Done |
+| 5 Turnover estimation | Done |
+| 6 Currency parity | Done |
+| 7 Background ops (Railway) | Done |
 
 ## Risks & Mitigations
 

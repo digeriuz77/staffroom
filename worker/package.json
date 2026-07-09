@@ -1,0 +1,12 @@
+{
+  "name": "staffroom-intel-worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "bun run index.ts",
+    "cron:daily": "bun run cron.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.110.2"
+  }
+}

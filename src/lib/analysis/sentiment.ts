@@ -82,3 +82,42 @@ export function buildSentimentReport(school: School, posts: SentimentPost[]): Se
     provenance,
   };
 }
+
+export interface ClusteredTheme {
+  theme: string;
+  count: number;
+  sentimentScore: number;
+  summary: string | null;
+}
+
+/**
+ * Read precomputed theme clusters (from the pgvector pipeline) for a school.
+ * Returns null when Supabase is unavailable or no clusters exist.
+ */
+export async function getClusteredThemes(schoolId: string): Promise<ClusteredTheme[] | null> {
+  const { supabaseServer } = await import("@/lib/db/supabaseClients");
+  const client = supabaseServer();
+  if (!client) return null;
+  const { data } = await client
+    .from("theme_clusters")
+    .select("theme_label, post_count, sentiment_score, summary")
+    .eq("school_id", schoolId)
+    .order("computed_at", { ascending: false });
+  const rows = (data as
+    | { theme_label: string; post_count: number; sentiment_score: number; summary: string | null }[]
+    | null);
+  if (!rows || rows.length === 0) return null;
+  // Keep the latest row per theme.
+  const seen = new Map<string, ClusteredTheme>();
+  for (const r of rows) {
+    if (!seen.has(r.theme_label)) {
+      seen.set(r.theme_label, {
+        theme: r.theme_label,
+        count: r.post_count,
+        sentimentScore: r.sentiment_score,
+        summary: r.summary,
+      });
+    }
+  }
+  return Array.from(seen.values()).sort((a, b) => b.count - a.count);
+}
