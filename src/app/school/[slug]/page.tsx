@@ -7,6 +7,7 @@ import { SentimentPanel } from "@/components/SentimentPanel";
 import { TanePanel } from "@/components/TanePanel";
 import { ArrowIcon } from "@/components/icons";
 import { verdictTone, sentimentTone, TONE_CLASSES, pct } from "@/lib/tone";
+import { getTaxRateForCountry } from "@/lib/db/repo";
 import type { Metadata } from "next";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -37,6 +38,7 @@ export default async function SchoolReport({ params, searchParams }: {
   if (!report) notFound();
 
   const { school, schoolStats, countryStats, regionStats, histogram, col, offer: offerAnalysis, records } = report;
+  const taxRate = await getTaxRateForCountry(school.country);
   const vTone = offerAnalysis ? verdictTone(offerAnalysis.verdict) : null;
   const vClasses = vTone ? TONE_CLASSES[vTone] : null;
   const lo = Math.min(countryStats.min, regionStats.min);
@@ -131,6 +133,28 @@ export default async function SchoolReport({ params, searchParams }: {
         </div>
 
         <div className="space-y-6 lg:col-span-2">
+          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+            <h2 className="text-lg font-semibold text-white">Tax regime</h2>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <span className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-slate-200">
+                {taxRate.taxRegime}
+              </span>
+              <span className="text-2xl font-bold text-emerald-300">
+                {Math.round(taxRate.takeHomePct * 100)}% take-home
+              </span>
+              <span className="text-sm text-slate-500">
+                ~{Math.round(taxRate.effectiveRate * 100)}% effective tax
+                {taxRate.socialInsuranceRate != null && ` + ${Math.round(taxRate.socialInsuranceRate * 100)}% social`}
+              </span>
+            </div>
+            {taxRate.specialNotes && (
+              <p className="mt-3 text-sm leading-relaxed text-slate-400">{taxRate.specialNotes}</p>
+            )}
+            <p className="mt-2 text-xs text-slate-600">
+              Currency: {taxRate.currency} · Source: {taxRate.country === "Unknown" ? "estimated default" : "researched 2026"}
+            </p>
+          </section>
+
           {col && (
             <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
               <h2 className="text-lg font-semibold text-white">Cost of living &amp; power</h2>

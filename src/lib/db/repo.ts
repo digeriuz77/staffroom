@@ -222,3 +222,45 @@ export async function getColNearest(city: string, country: string): Promise<ColI
   const byCountry = items.find((c) => c.country.toLowerCase() === country.toLowerCase());
   return byCountry ?? items.find((c) => c.country === "United Kingdom");
 }
+
+// ---------------------------------------------------------------------------
+// Tax rates (reference data — Supabase or static fallback)
+// ---------------------------------------------------------------------------
+
+import type { TaxRateEntry } from "@/lib/data/taxRates";
+import { getTaxRateStatic } from "@/lib/data/taxRates";
+
+interface TaxRateRow {
+  country: string;
+  currency: string;
+  effective_rate: number;
+  social_insurance_rate: number | null;
+  tax_regime: string;
+  special_notes: string;
+}
+
+function rowToTaxRate(row: TaxRateRow): TaxRateEntry {
+  return {
+    country: row.country,
+    currency: row.currency,
+    effectiveRate: Number(row.effective_rate),
+    socialInsuranceRate: row.social_insurance_rate != null ? Number(row.social_insurance_rate) : null,
+    taxRegime: row.tax_regime,
+    takeHomePct: 1 - Number(row.effective_rate),
+    specialNotes: row.special_notes,
+  };
+}
+
+export async function getTaxRateForCountry(country: string): Promise<TaxRateEntry> {
+  if (!supabaseEnabled()) {
+    return getTaxRateStatic(country);
+  }
+  const client = supabaseServer()!;
+  const { data } = await client
+    .from("country_tax_rates")
+    .select("country, currency, effective_rate, social_insurance_rate, tax_regime, special_notes")
+    .ilike("country", country.trim())
+    .maybeSingle();
+  if (data) return rowToTaxRate(data as TaxRateRow);
+  return getTaxRateStatic(country);
+}

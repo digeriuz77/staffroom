@@ -3,19 +3,11 @@
 // internally so cross-school ordering is always consistent.
 import { supabaseServer } from "@/lib/db/supabaseClients";
 import type { FxRateRow } from "@/lib/db/types";
+import { FX_RATES_STATIC } from "@/lib/data/exchangeRates";
 
-const FALLBACK_RATES: Record<string, number> = {
-  USD: 1,
-  GBP: 0.79,
-  EUR: 0.92,
-  AUD: 1.52,
-  CAD: 1.37,
-  AED: 3.67,
-  CNY: 7.24,
-  THB: 36,
-  JPY: 156,
-  SGD: 1.35,
-};
+// Static fallback rates (rate_to_usd format: 1 / units-per-USD).
+// Re-exported from the researched dataset so the app works offline.
+const FALLBACK_RATES: Record<string, number> = FX_RATES_STATIC;
 
 let cache: { rates: Record<string, number>; at: number } | null = null;
 const TTL_MS = 60 * 60 * 1000; // 1 hour in-process cache
