@@ -5,6 +5,8 @@ import { buildSalaryReport, formatUsd } from "@/lib/analysis/salary";
 import { Histogram, StatBar } from "@/components/charts";
 import { SentimentPanel } from "@/components/SentimentPanel";
 import { TanePanel } from "@/components/TanePanel";
+import { WebsiteHealthPanel } from "@/components/WebsiteHealthPanel";
+import { RolePreviewPanel } from "@/components/RolePreviewPanel";
 import { ArrowIcon } from "@/components/icons";
 import { verdictTone, sentimentTone, TONE_CLASSES, pct } from "@/lib/tone";
 import { getTaxRateForCountry } from "@/lib/db/repo";
@@ -22,10 +24,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function SchoolReport({ params, searchParams }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ offer?: string }>;
+  searchParams: Promise<{ offer?: string; role?: string }>;
 }) {
   const { slug } = await params;
-  const { offer } = await searchParams;
+  const { offer, role } = await searchParams;
   const offerMonthly = offer ? Number(offer) : undefined;
   const derived = getDerivedSchool(slug);
   if (!derived) notFound();
@@ -85,6 +87,12 @@ export default async function SchoolReport({ params, searchParams }: {
             <MiniStat label="monthly savings" value={formatUsd(offerAnalysis.monthlySavingsUsd)} sub={`${pct(offerAnalysis.savingsRate)} of net`} />
             <MiniStat label="buying power" value={formatUsd(offerAnalysis.buyingPowerUsd)} sub="COL-adjusted" />
           </div>
+
+          {(role || offerAnalysis) && (
+            <div className="mt-4">
+              <RolePreviewPanel roleText={role ?? (derived?.records[0]?.role ?? "")} />
+            </div>
+          )}
         </div>
       )}
 
@@ -179,6 +187,8 @@ export default async function SchoolReport({ params, searchParams }: {
           )}
 
           <SentimentPanel schoolId={school.id} schoolName={school.name} />
+
+          <WebsiteHealthPanel schoolName={school.name} city={school.city} country={school.country} />
         </div>
       </div>
     </main>

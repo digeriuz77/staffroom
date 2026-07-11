@@ -35,7 +35,10 @@ export function PasteLink() {
       if (!res.ok) throw new Error(data.error ?? "Failed to analyze");
 
       if (data.parsed.matchedSchoolId) {
-        const qs = data.parsed.offeredMonthlyUsd ? `?offer=${data.parsed.offeredMonthlyUsd}` : "";
+        const params = new URLSearchParams();
+        if (data.parsed.offeredMonthlyUsd) params.set("offer", String(data.parsed.offeredMonthlyUsd));
+        if (data.parsed.role) params.set("role", data.parsed.role);
+        const qs = params.toString() ? `?${params.toString()}` : "";
         router.push(`/school/${data.parsed.matchedSchoolId}${qs}`);
       } else {
         setQuery(data.parsed.schoolName ?? extractHost(url));
