@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 import type { WebsiteHealthSignals } from "@/lib/analysis/websiteHealth";
+import {
+  buildDeepLinks,
+  CATEGORY_LABELS,
+  CATEGORY_ORDER,
+  type SourceCategory,
+} from "@/lib/data/platformRegistry";
 
 interface Props {
   schoolName: string;
@@ -92,20 +98,18 @@ export function WebsiteHealthPanel({ schoolName, city, country, websiteUrl }: Pr
             ))}
           </div>
 
-          {/* External community links */}
+          {/* External community links (registry-driven) */}
           <div className="mt-4">
-            <p className="mb-2 text-xs font-medium text-slate-400">Find more on external communities</p>
-            <div className="flex flex-wrap gap-2">
-              {buildExternalLinks(schoolName).map((link) => (
-                <a
-                  key={link.label}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300 transition hover:border-indigo-400/30 hover:text-indigo-200"
-                >
-                  {link.label} ↗
-                </a>
+            <p className="mb-3 text-xs font-medium text-slate-400">
+              Research {schoolName} across {PLATFORM_COUNT} platforms
+            </p>
+            <div className="space-y-3">
+              {CATEGORIES.map((cat) => (
+                <DeepLinkGroup
+                  key={cat}
+                  schoolName={schoolName}
+                  category={cat}
+                />
               ))}
             </div>
           </div>
@@ -147,13 +151,43 @@ function SignalDot({ status }: { status: "good" | "warn" | "bad" | "unknown" }) 
   return <span className={`mt-1 h-2 w-2 flex-shrink-0 rounded-full ${colors[status]}`} />;
 }
 
-function buildExternalLinks(schoolName: string): { label: string; url: string }[] {
-  const q = encodeURIComponent(`"${schoolName}"`);
-  return [
-    { label: "Google", url: `https://www.google.com/search?q=${q}+teacher+review+experience` },
-    { label: "Glassdoor", url: `https://www.glassdoor.com/Search/results.htm?keyword=${q}` },
-    { label: "ISC", url: `https://app.internationalschoolcommunity.com/?s=${encodeURIComponent(schoolName)}` },
-    { label: "ISR Forum", url: `https://internationalschoolsreview.com/v-web/bulletin/bb/search.php?keywords=${encodeURIComponent(schoolName)}` },
-    { label: "Reddit", url: `https://www.reddit.com/search/?q=${q}` },
-  ];
+const CATEGORIES: SourceCategory[] = CATEGORY_ORDER;
+import { PLATFORM_REGISTRY } from "@/lib/data/platformRegistry";
+const PLATFORM_COUNT = PLATFORM_REGISTRY.length;
+
+function DeepLinkGroup({
+  schoolName,
+  category,
+}: {
+  schoolName: string;
+  category: SourceCategory;
+}) {
+  const links = buildDeepLinks(schoolName, { category, minPriority: 2 });
+  if (links.length === 0) return null;
+  return (
+    <div>
+      <p className="mb-1 text-[11px] uppercase tracking-wider text-slate-600">
+        {CATEGORY_LABELS[category]}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {links.map((link) => (
+          <a
+            key={link.key}
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300 transition hover:border-indigo-400/30 hover:text-indigo-200"
+          >
+            {link.label}
+            {link.access !== "free" && (
+              <span className="text-[9px] text-amber-400/70" title={`${link.access} access`}>
+                {link.access === "paid" ? "$" : link.access === "membership" ? "●" : "▲"}
+              </span>
+            )}
+            <span className="text-slate-600">↗</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
 }
