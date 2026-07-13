@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeFetch } from "@/lib/net/safeFetch";
 import { assessWebsiteHealth } from "@/lib/analysis/websiteHealth";
 
 export const runtime = "nodejs";
@@ -23,21 +24,10 @@ export async function POST(request: Request) {
   let lastModified: string | null = null;
 
   if (url) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      const res = await fetch(url, {
-        signal: controller.signal,
-        headers: { "user-agent": "StaffroomIntel/1.0 (+https://staffroom-intel.app)" },
-        redirect: "follow",
-      });
-      clearTimeout(timeout);
-      if (res.ok) {
-        html = await res.text();
-        lastModified = res.headers.get("last-modified");
-      }
-    } catch {
-      html = "";
+    const result = await safeFetch(url);
+    if (result.ok) {
+      html = result.text;
+      lastModified = result.lastModified;
     }
   }
 

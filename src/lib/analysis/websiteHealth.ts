@@ -74,8 +74,13 @@ function extractSocialLinks(html: string): string[] {
   return socials.slice(0, 5);
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function countInternalLinks(html: string, domain: string): number {
-  const re = new RegExp(`href=["']/?[^"']*(?:${domain.replace(/\./g, "\\.")}|^/)[^"']*["']`, "gi");
+  const safe = escapeRegExp(domain);
+  const re = new RegExp(`href=["']/?[^"']*(?:${safe}|^/)[^"']*["']`, "gi");
   return (html.match(re) ?? []).length;
 }
 

@@ -102,13 +102,19 @@ export async function approveSalarySubmission(
     .eq("id", submissionId);
   if (updErr) return { error: updErr.message };
 
-  // Award reputation to the submitter.
+  // Award reputation to the submitter. Log on failure — do NOT silently lose it.
   if (sub.submitter_id) {
-    await awardReputation(sub.submitter_id, TIER_POINTS[trustTier]);
+    const repErr = await awardReputation(sub.submitter_id, TIER_POINTS[trustTier]);
+    if (repErr) {
+      console.error(`[approveSalary] reputation award failed for ${sub.submitter_id}: ${repErr}`);
+    }
   }
 
   // Fill any matching open bounty for this school/country.
-  await fulfillMatchingBounty(sub.school_id, sub.country, sub.submitter_id);
+  const bountyErr = await fulfillMatchingBounty(sub.school_id, sub.country, sub.submitter_id);
+  if (bountyErr) {
+    console.error(`[approveSalary] bounty fulfillment failed for ${submissionId}: ${bountyErr}`);
+  }
   return { error: null };
 }
 
@@ -126,33 +132,35 @@ export async function rejectSalarySubmission(
   return { error: error?.message ?? null };
 }
 
-export async function awardReputation(userId: string, points: number): Promise<void> {
+export async function awardReputation(userId: string, points: number): Promise<string | null> {
   const client = supabaseServer();
-  if (!client || points <= 0) return;
-  await client.rpc("increment_reputation", { p_user: userId, p_points: points });
+  if (!client || points <= 0) return null;
+  const { error } = await client.rpc("increment_reputation", { p_user: userId, p_points: points });
+  return error?.message ?? null;
 }
 
 async function fulfillMatchingBounty(
   schoolId: string | null,
   country: string | null,
   fillerId: string | null,
-): Promise<void> {
+): Promise<string | null> {
   const client = supabaseServer();
-  if (!client || !fillerId) return;
+  if (!client || !fillerId) return null;
   const match = schoolId
     ? { school_id: schoolId }
     : country
       ? { scope_kind: "country", scope_value: country }
       : null;
-  if (!match) return;
-  const { data } = await client
+  if (!match) return null;
+  const { data, error: selErr } = await client
     .from("bounties")
     .select("id, reward_points")
     .match({ ...match, status: "open" })
     .limit(1);
+  if (selErr) return selErr.message;
   const bounty = (data as BountyRow[] | null)?.[0];
-  if (!bounty) return;
-  await client
+  if (!bounty) return null;
+  const { error: updErr } = await client
     .from("bounties")
     .update({
       status: "filled",
@@ -160,7 +168,9 @@ async function fulfillMatchingBounty(
       filled_at: new Date().toISOString(),
     })
     .eq("id", bounty.id);
-  await awardReputation(fillerId, bounty.reward_points);
+  if (updErr) return updErr.message;
+  const repErr = await awardReputation(fillerId, bounty.reward_points);
+  return repErr;
 }
 
 // ---------------------------------------------------------------------------

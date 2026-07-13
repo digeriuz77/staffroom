@@ -16,7 +16,7 @@ export default function Home() {
         <div className="bg-grid absolute inset-0" />
         <div className="glow absolute inset-x-0 top-0 h-[480px]" />
         <div className="relative mx-auto max-w-4xl px-4 pb-20 pt-20 text-center sm:pt-28">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-slate-300">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-1.5 text-xs font-medium text-slate-300 backdrop-blur-sm">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
@@ -26,12 +26,10 @@ export default function Home() {
 
           <h1 className="text-balance text-4xl font-bold tracking-tight text-white sm:text-6xl">
             Know what an international teaching job is{" "}
-            <span className="bg-gradient-to-r from-indigo-400 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
-              really worth
-            </span>
+            <span className="text-gradient">really worth</span>
           </h1>
 
-          <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-slate-400">
+          <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-slate-400">
             Paste a job link. Instantly see how the salary compares to real verified packages,
             what your purchasing power and savings will be, and what teachers actually say about the school.
           </p>
@@ -83,7 +81,7 @@ export default function Home() {
 
 function FeatureCard({ title, desc }: { title: string; desc: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-white/20 hover:bg-white/[0.05]">
+    <div className="glass rounded-2xl p-6 transition hover:-translate-y-0.5 hover:bg-white/[0.05]">
       <h3 className="text-base font-semibold text-white">{title}</h3>
       <p className="mt-2 text-sm leading-relaxed text-slate-400">{desc}</p>
     </div>

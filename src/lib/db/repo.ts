@@ -88,6 +88,28 @@ export function rowToColItem(row: ColItemRow): ColItem {
 // Derived School (school + its records)
 // ---------------------------------------------------------------------------
 
+/**
+ * Batch-load all approved salary records and group by school_id, avoiding an
+ * N+1 query when assembling multiple DerivedSchool entries.
+ */
+async function loadRecordsBySchool(): Promise<Map<string, SalaryRecord[]>> {
+  const client = supabaseServer();
+  if (!client) return new Map();
+  const { data, error } = await client
+    .from("salary_records")
+    .select("*")
+    .eq("status", "approved");
+  if (error || !data) return new Map();
+  const bySchool = new Map<string, SalaryRecord[]>();
+  for (const row of (data as SalaryRecordRow[]) ?? []) {
+    if (!row.school_id) continue;
+    const list = bySchool.get(row.school_id) ?? [];
+    list.push(rowToSalaryRecord(row));
+    bySchool.set(row.school_id, list);
+  }
+  return bySchool;
+}
+
 export interface DerivedSchool {
   school: School;
   records: SalaryRecord[];
@@ -100,11 +122,11 @@ export async function getSchools(): Promise<DerivedSchool[]> {
   const client = supabaseServer()!;
   const { data: schools, error } = await client.from("schools").select("*");
   if (error || !schools) return [];
-  const out: DerivedSchool[] = [];
-  for (const s of schools as SchoolRow[]) {
-    const records = await getSalaryRecordsForSchool(s.id);
-    out.push({ school: rowToSchool(s, records.length), records });
-  }
+  const recordsBySchool = await loadRecordsBySchool();
+  const out: DerivedSchool[] = (schools as SchoolRow[]).map((s) => {
+    const records = recordsBySchool.get(s.id) ?? [];
+    return { school: rowToSchool(s, records.length), records };
+  });
   out.sort(
     (a, b) =>
       b.records.length - a.records.length ||
@@ -148,11 +170,11 @@ export async function searchSchools(query: string): Promise<DerivedSchool[]> {
     data = (rows as SchoolRow[]) ?? null;
   }
   if (!data) return [];
-  const out: DerivedSchool[] = [];
-  for (const s of data) {
-    const records = await getSalaryRecordsForSchool(s.id);
-    out.push({ school: rowToSchool(s, records.length), records });
-  }
+  const recordsBySchool = await loadRecordsBySchool();
+  const out: DerivedSchool[] = data.map((s) => {
+    const records = recordsBySchool.get(s.id) ?? [];
+    return { school: rowToSchool(s, records.length), records };
+  });
   return out;
 }
 

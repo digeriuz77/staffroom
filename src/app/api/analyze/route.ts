@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeFetch } from "@/lib/net/safeFetch";
 import { parseJobLink } from "@/lib/parser/jobLink";
 
 export const runtime = "nodejs";
@@ -14,19 +15,8 @@ export async function POST(request: Request) {
   if (!url) return NextResponse.json({ error: "A job link URL is required" }, { status: 400 });
 
   let html = "";
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { "user-agent": "StaffroomIntel/1.0 (+school intelligence tool)" },
-      redirect: "follow",
-    });
-    clearTimeout(timeout);
-    if (res.ok) html = await res.text();
-  } catch {
-    html = "";
-  }
+  const result = await safeFetch(url, { timeoutMs: 6000 });
+  if (result.ok) html = result.text;
 
   const parsed = parseJobLink(url, { html });
   return NextResponse.json({ parsed });
