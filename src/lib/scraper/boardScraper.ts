@@ -45,19 +45,48 @@ async function fetchListing(source: JobBoardSource, query: string): Promise<stri
 
 // Naive title extraction: pull <h*> and og:title-like fragments. This is
 // intentionally loose; the turnover signal is driven by posting FREQUENCY, so
-// precise per-listing parsing is not required for the baseline.
-function extractListings(html: string, source: JobBoardSource): { title: string; url: string | null }[] {
-  const out: { title: string; url: string | null }[] = [];
+// precise per-listing parsing is not required for the baseline. Also attempts
+// to extract a nearby posting date from the listing's context.
+interface ExtractedListing {
+  title: string;
+  url: string | null;
+  postedAt: string | null;
+}
+
+function extractListings(html: string, source: JobBoardSource): ExtractedListing[] {
+  const out: ExtractedListing[] = [];
   const titleRe = /<h[1-4][^>]*>([^<]{8,140})<\/h[1-4]>/gi;
   let m: RegExpExecArray | null;
   while ((m = titleRe.exec(html)) && out.length < 40) {
     const title = m[1].replace(/&amp;/g, "&").trim();
     if (/teacher|school|head|director|coordinator|lecturer|faculty/i.test(title)) {
-      out.push({ title, url: null });
+      // Look for a date in the ~300 chars surrounding the title for context.
+      const ctxStart = Math.max(0, m.index - 150);
+      const ctxEnd = Math.min(html.length, m.index + m[0].length + 150);
+      const context = html.slice(ctxStart, ctxEnd);
+      out.push({ title, url: null, postedAt: extractDate(context) });
     }
   }
   void source;
   return out;
+}
+
+/** Extract the first plausible date from a text fragment; null if none found. */
+function extractDate(text: string): string | null {
+  const patterns = [
+    /20(?:2[3-6])[-/](0?[1-9]|1[0-2])[-/](0?[1-9]|[12]\d|3[01])/,
+    /\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(20(?:2[3-6]))/i,
+    /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2}),?\s+(20(?:2[3-6]))/i,
+    /\b(\d+)\s+(day|week|month)s?\s+ago/i,
+  ];
+  for (const re of patterns) {
+    const match = text.match(re);
+    if (match) {
+      const d = new Date(match[0].includes("ago") ? match[0] : match[0]);
+      if (!isNaN(d.getTime()) && d.getFullYear() >= 2023) return d.toISOString();
+    }
+  }
+  return null;
 }
 
 export async function runScraper(payload: ScrapePayload): Promise<number> {
@@ -80,6 +109,7 @@ export async function runScraper(payload: ScrapePayload): Promise<number> {
     queries = ["international school", "head of department", "primary teacher"];
   }
 
+  const nowIso = new Date().toISOString();
   let inserted = 0;
   for (const source of sources) {
     for (const q of queries) {
@@ -94,8 +124,8 @@ export async function runScraper(payload: ScrapePayload): Promise<number> {
             school_text: null,
             title: l.title,
             raw_url: l.url,
-            posted_at: new Date().toISOString(),
-            first_seen_at: new Date().toISOString(),
+            posted_at: l.postedAt ?? nowIso,
+            first_seen_at: nowIso,
           },
           { onConflict: "hash", ignoreDuplicates: true },
         );

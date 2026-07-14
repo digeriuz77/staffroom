@@ -30,9 +30,22 @@ export interface SafeFetchResult {
   lastModified: string | null;
 }
 
-function isBlockedHost(hostname: string): boolean {
+export function isBlockedHost(hostname: string): boolean {
   const h = hostname.replace(/^\[|\]$/g, "").toLowerCase();
   return BLOCKED_HOSTNAME_PATTERNS.some((re) => re.test(h));
+}
+
+/** Validate a URL string against SSRF rules. Returns true if the URL is safe. */
+export function isUrlSafe(rawUrl: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+  if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) return false;
+  if (isBlockedHost(parsed.hostname)) return false;
+  return true;
 }
 
 /**

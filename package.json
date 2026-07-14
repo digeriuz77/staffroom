@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test": "bun test",
     "db:seed": "bun run scripts/seed.ts",
     "db:parity": "bun run scripts/parity-check.ts",
     "worker": "bun run worker/index.ts"

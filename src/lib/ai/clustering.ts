@@ -80,7 +80,9 @@ export async function runClustering(payload: ClusterPayload): Promise<number> {
     let query = client
       .from("reddit_posts")
       .select("id, embedding, sentiment_score, themes, title, body")
-      .gte("created_at", windowStart.toISOString());
+      .gte("created_at", windowStart.toISOString())
+      .order("created_at", { ascending: false })
+      .limit(500);
     if (schoolId) query = query.eq("school_id", schoolId);
     else query = query.is("school_id", null);
     const { data } = await query;
