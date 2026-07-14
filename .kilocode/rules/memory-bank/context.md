@@ -60,9 +60,20 @@ src/components/             AuthProvider, AuthButton, CurrencyProvider, TanePane
 |------|---------|
 | 2026-07-09 | Built Staffroom Intel MVP |
 | 2026-07-09 | Expansion: Supabase foundation (Area 1), Railway worker + queue (Area 7), pgvector semantics (Area 4), turnover monitor (Area 5), currency parity (Area 6), household + TANE (Area 2), bounty/self-report (Area 3). Typecheck + lint clean. Build blocked in sandbox only by Google Fonts network access (pre-existing, unrelated). |
+| 2026-07-10 | Tax rates (90+ countries) + FX seed (90+ currencies); take-home estimator; tax card on school report. |
+| 2026-07-11 | Role profiles (14 leadership roles) + inference engine; website health checker; expanded social sources (37-platform registry). |
+| 2026-07-13 | Security review: SSRF guard (safeFetch), N+1 fix (loadRecordsBySchool), regex injection fix, error propagation in reputation/bounty flows. Aesthetic polish (glass design system). |
+| 2026-07-14 | 65-test suite (safeFetch, websiteHealth, roleInference, currency, taxRates, platformRegistry). Minor fixes: clustering LIMIT, scraper date extraction. Created DEPLOYMENT.md, ROADMAP.md, ASSESSMENT.md. |
 
 ## Pending / Next
-- Deploy: set Supabase env vars, run `0001–0004` migrations, `bun db:seed`, `bun db:parity`, deploy worker to Railway with REDDIT_*/EMBEDDINGS_* creds.
-- Cutover read paths from TSV to Supabase (repo.ts ready; UI still on sync TSV for now).
+- Deploy: set Supabase env vars, run `0001–0005` migrations, `bun db:seed`, `bun db:parity`, deploy worker to Railway with REDDIT_*/EMBEDDINGS_* creds.
+- **Cutover read paths from TSV to Supabase** (repo.ts ready; UI still on sync TSV for now). This is the top priority per ASSESSMENT.md.
 - Moderation queue UI + role-gated approve route (logic in `submissions.ts`).
 - Wire `SentimentPanel` to `getClusteredThemes` when Supabase live.
+- Comparison view (Tier 1.1 in ROADMAP.md) — the #1 missing user flow.
+- Add CI/CD pipeline (GitHub Actions: lint + test + typecheck).
+
+## Key Documentation
+- `DEPLOYMENT.md` — full deployment guide (Vercel + Supabase + Railway)
+- `ROADMAP.md` — future features classified by feasibility + impact
+- `ASSESSMENT.md` — developer goal-alignment review (honest assessment)
