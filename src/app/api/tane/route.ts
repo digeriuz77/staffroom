@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDerivedSchool } from "@/lib/data/schools";
+import { getSchoolBySlug } from "@/lib/db/repo";
 import { computeTANE, type TaneResult } from "@/lib/analysis/tane";
 import { defaultHousehold } from "@/lib/analysis/household";
 import { statsFor } from "@/lib/analysis/finance";
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   const slug = (body.slug ?? "").trim();
   if (!slug) return NextResponse.json({ error: "slug is required" }, { status: 400 });
 
-  const derived = getDerivedSchool(slug);
+  const derived = await getSchoolBySlug(slug);
   if (!derived) return NextResponse.json({ error: "School not found" }, { status: 404 });
 
   const household = body.household ?? defaultHousehold();

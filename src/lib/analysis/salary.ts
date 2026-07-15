@@ -1,18 +1,22 @@
 import type { ColItem, ParsedJob, SalaryRecord, School } from "@/lib/types";
-import { getDerivedSchool } from "@/lib/data/schools";
-import { colNearest, monthlyLivingCostUsd } from "@/lib/data/costOfLiving";
 import {
   formatUsd,
   grossValues,
   histogram,
   netValues,
   percentileOf,
-  recordsForCountry,
-  recordsForRegion,
   statsFor,
   type HistogramBucket,
   type SalaryStats,
 } from "@/lib/analysis/finance";
+import { monthlyLivingCostUsd } from "@/lib/data/costOfLiving";
+import {
+  getSchoolBySlug,
+  getSalaryRecordsForCountry,
+  getSalaryRecordsForRegion,
+  getColNearest,
+} from "@/lib/db/repo";
+import { regionOfCountry } from "@/lib/data/geo";
 
 export type OfferVerdict = "Strong offer" | "Competitive" | "Fair" | "Below market";
 
@@ -50,19 +54,29 @@ function verdictFrom(pct: number, savingsRate: number): { verdict: OfferVerdict;
   return { verdict: "Strong offer", reason: "Offer is in the top quartile with strong savings potential." };
 }
 
-export function buildSalaryReport(schoolId: string, job?: ParsedJob | null): SalaryReport | null {
-  const derived = getDerivedSchool(schoolId);
+function avg(arr: number[]): number {
+  if (!arr.length) return 0;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+export async function buildSalaryReportAsync(
+  slug: string,
+  job?: ParsedJob | null,
+): Promise<SalaryReport | null> {
+  const derived = await getSchoolBySlug(slug);
   if (!derived) return null;
+
   const { school, records } = derived;
 
-  const countryRecs = recordsForCountry(school.country);
-  const regionRecs = recordsForRegion(school.region);
+  const [countryRecs, regionRecs, col] = await Promise.all([
+    getSalaryRecordsForCountry(school.country),
+    getSalaryRecordsForRegion(school.region),
+    getColNearest(school.city, school.country),
+  ]);
 
   const schoolStats = statsFor(netValues(records.length >= 3 ? records : countryRecs));
   const countryStats = statsFor(netValues(countryRecs));
   const regionStats = statsFor(netValues(regionRecs));
-
-  const col = colNearest(school.city, school.country);
 
   const histValues = [...netValues(regionRecs), ...netValues(countryRecs)];
   const hist = histogram(histValues.length ? histValues : grossValues(regionRecs));
@@ -107,11 +121,6 @@ export function buildSalaryReport(schoolId: string, job?: ParsedJob | null): Sal
     col,
     offer,
   };
-}
-
-function avg(arr: number[]): number {
-  if (!arr.length) return 0;
-  return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
 export { formatUsd };

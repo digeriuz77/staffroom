@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { COST_OF_LIVING, colNearest } from "@/lib/data/costOfLiving";
+import { getColNearest, getColItems } from "@/lib/db/repo";
 
 export const runtime = "nodejs";
 
@@ -9,10 +9,11 @@ export async function GET(request: Request) {
   const country = searchParams.get("country") ?? "";
 
   if (city || country) {
-    const match = colNearest(city, country);
+    const match = await getColNearest(city, country);
     if (match) return NextResponse.json({ city: match });
   }
 
-  const sorted = [...COST_OF_LIVING].sort((a, b) => b.buyingPowerUsd - a.buyingPowerUsd);
+  const items = await getColItems();
+  const sorted = [...items].sort((a, b) => b.buyingPowerUsd - a.buyingPowerUsd);
   return NextResponse.json({ cities: sorted });
 }

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { HOUSEHOLD_PRESETS, defaultHousehold } from "@/lib/analysis/household";
+import { HOUSEHOLD_PRESETS } from "@/lib/analysis/household";
 import type { Household, ValuationBasis } from "@/lib/db/types";
 import type { TaneComponent, TaneResult } from "@/lib/analysis/tane";
 import { useCurrency } from "@/components/CurrencyProvider";
+import { useSavedHousehold } from "@/components/useSavedHousehold";
 
 interface Props {
   slug: string;
@@ -28,8 +29,19 @@ const COMPONENT_LABEL: Record<string, string> = {
 };
 
 export function TanePanel({ slug, offerMonthlyUsd }: Props) {
-  const [household, setHousehold] = useState<Household>(defaultHousehold());
+  const { household, setHousehold, loaded } = useSavedHousehold();
   const { currency } = useCurrency();
+
+  // Wait for localStorage to load before rendering results to avoid
+  // a flash of default household then re-fetch.
+  if (!loaded) {
+    return (
+      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+        <h2 className="text-lg font-semibold text-white">Total package (TANE)</h2>
+        <p className="mt-2 text-sm text-slate-500">Loading…</p>
+      </section>
+    );
+  }
 
   return (
     <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">

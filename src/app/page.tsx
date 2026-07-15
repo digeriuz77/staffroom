@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { PasteLink } from "@/components/PasteLink";
 import { CheckIcon, SparkIcon } from "@/components/icons";
-import { totalRecordCount } from "@/lib/data/schools";
+import { SALARIES } from "@/lib/data/schools";
 import { COST_OF_LIVING } from "@/lib/data/costOfLiving";
-import { deriveSchools } from "@/lib/data/schools";
 
-export default function Home() {
-  const salaries = totalRecordCount();
-  const schools = deriveSchools().length;
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const salaries = SALARIES.length;
+  const schools = new Set(SALARIES.map((r) => `${r.school}|${r.city}|${r.country}`)).size;
   const cities = COST_OF_LIVING.length;
 
   return (

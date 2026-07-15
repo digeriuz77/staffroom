@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getDerivedSchool } from "@/lib/data/schools";
-import { buildSalaryReport, formatUsd } from "@/lib/analysis/salary";
+import { buildSalaryReportAsync, formatUsd } from "@/lib/analysis/salary";
 import { Histogram, StatBar } from "@/components/charts";
 import { SentimentPanel } from "@/components/SentimentPanel";
 import { TanePanel } from "@/components/TanePanel";
 import { WebsiteHealthPanel } from "@/components/WebsiteHealthPanel";
 import { RolePreviewPanel } from "@/components/RolePreviewPanel";
+import { ProvenanceBadge, DataDisclaimer } from "@/components/ProvenanceBadge";
 import { ArrowIcon } from "@/components/icons";
 import { verdictTone, sentimentTone, TONE_CLASSES, pct } from "@/lib/tone";
 import { getTaxRateForCountry } from "@/lib/db/repo";
@@ -14,11 +14,11 @@ import type { Metadata } from "next";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const derived = getDerivedSchool(slug);
-  if (!derived) return { title: "School not found" };
+  const meta = await buildSalaryReportAsync(slug);
+  if (!meta) return { title: "School not found" };
   return {
-    title: `${derived.school.name} — salary, purchasing power & sentiment`,
-    description: `Real salary data, cost of living and teacher reviews for ${derived.school.name} in ${derived.school.city}, ${derived.school.country}.`,
+    title: `${meta.school.name} — salary, purchasing power & sentiment`,
+    description: `Real salary data, cost of living and teacher reviews for ${meta.school.name} in ${meta.school.city}, ${meta.school.country}.`,
   };
 }
 
@@ -29,14 +29,12 @@ export default async function SchoolReport({ params, searchParams }: {
   const { slug } = await params;
   const { offer, role } = await searchParams;
   const offerMonthly = offer ? Number(offer) : undefined;
-  const derived = getDerivedSchool(slug);
-  if (!derived) notFound();
 
   const job = offerMonthly && Number.isFinite(offerMonthly)
     ? { ok: true, source: "unknown" as const, rawUrl: "", offeredMonthlyUsd: offerMonthly }
     : null;
 
-  const report = buildSalaryReport(slug, job);
+  const report = await buildSalaryReportAsync(slug, job);
   if (!report) notFound();
 
   const { school, schoolStats, countryStats, regionStats, histogram, col, offer: offerAnalysis, records } = report;
@@ -65,6 +63,14 @@ export default async function SchoolReport({ params, searchParams }: {
         <p className="mt-2 text-sm text-slate-400">
           {records.length} real salary record{records.length !== 1 ? "s" : ""} · data from {Math.min(...school.years)}–{Math.max(...school.years)}
         </p>
+        <div className="mt-3 flex gap-2">
+          <Link
+            href={`/compare?schools=${school.slug}`}
+            className="inline-flex items-center gap-1 rounded-lg border border-indigo-400/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-200 transition hover:bg-indigo-500/20"
+          >
+            ⚖ Add to comparison
+          </Link>
+        </div>
       </header>
 
       {offerAnalysis && vClasses && (
@@ -90,7 +96,7 @@ export default async function SchoolReport({ params, searchParams }: {
 
           {(role || offerAnalysis) && (
             <div className="mt-4">
-              <RolePreviewPanel roleText={role ?? (derived?.records[0]?.role ?? "")} />
+              <RolePreviewPanel roleText={role ?? (report.records[0]?.role ?? "")} />
             </div>
           )}
         </div>
@@ -126,6 +132,7 @@ export default async function SchoolReport({ params, searchParams }: {
                   <div>
                     <span className="text-slate-300">{r.role || "Teacher"}</span>
                     <span className="ml-2 text-xs text-slate-500">{r.year}</span>
+                    <ProvenanceBadge tier="seed" />
                   </div>
                   <div className="flex items-center gap-3">
                     {r.housing !== "None" && <span className="text-xs text-indigo-300">{r.housing}</span>}
@@ -138,6 +145,8 @@ export default async function SchoolReport({ params, searchParams }: {
           </section>
 
           <TanePanel slug={school.slug} offerMonthlyUsd={offerAnalysis?.offeredMonthlyUsd} />
+
+          <DataDisclaimer />
         </div>
 
         <div className="space-y-6 lg:col-span-2">
