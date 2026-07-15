@@ -5,19 +5,34 @@ import { parseJobLink } from "@/lib/parser/jobLink";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  let body: { url?: string };
+  let body: { url?: string; text?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
+
   const url = (body.url ?? "").trim();
-  if (!url) return NextResponse.json({ error: "A job link URL is required" }, { status: 400 });
+  const pastedText = (body.text ?? "").trim();
 
+  if (!url && !pastedText) {
+    return NextResponse.json({ error: "Either a URL or pasted job description text is required" }, { status: 400 });
+  }
+
+  // Fetch HTML if a URL is provided (may fail due to scraping blocks — that's OK).
   let html = "";
-  const result = await safeFetch(url, { timeoutMs: 6000 });
-  if (result.ok) html = result.text;
+  if (url) {
+    const result = await safeFetch(url, { timeoutMs: 6000 });
+    if (result.ok) html = result.text;
+  }
 
-  const parsed = parseJobLink(url, { html });
+  // Parse from whatever sources we have: fetched HTML + pasted text.
+  const parsed = parseJobLink(url, { html, text: pastedText });
+
+  // If we got nothing useful and there's pasted text, surface it as a signal.
+  if (!parsed.matchedSchoolId && !parsed.offeredMonthlyUsd && pastedText) {
+    parsed.warning = "We extracted what we could from the text. Search for the school and enter the salary manually below.";
+  }
+
   return NextResponse.json({ parsed });
 }

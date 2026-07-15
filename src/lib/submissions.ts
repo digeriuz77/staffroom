@@ -115,6 +115,25 @@ export async function approveSalarySubmission(
   if (bountyErr) {
     console.error(`[approveSalary] bounty fulfillment failed for ${submissionId}: ${bountyErr}`);
   }
+
+  // Invalidate the cached school report so the new data appears immediately.
+  if (sub.school_id) {
+    const { data: schoolRow } = await client
+      .from("schools")
+      .select("slug")
+      .eq("id", sub.school_id)
+      .maybeSingle();
+    const slug = (schoolRow as { slug: string } | null)?.slug;
+    if (slug) {
+      try {
+        const { invalidateSchoolCache } = await import("@/lib/analysis/salary");
+        invalidateSchoolCache(slug);
+      } catch {
+        // Cache invalidation is best-effort — the 24h TTL will catch it.
+      }
+    }
+  }
+
   return { error: null };
 }
 

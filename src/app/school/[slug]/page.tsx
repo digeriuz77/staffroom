@@ -7,6 +7,7 @@ import { TanePanel } from "@/components/TanePanel";
 import { WebsiteHealthPanel } from "@/components/WebsiteHealthPanel";
 import { RolePreviewPanel } from "@/components/RolePreviewPanel";
 import { ProvenanceBadge, DataDisclaimer } from "@/components/ProvenanceBadge";
+import { OfferInput } from "@/components/OfferInput";
 import { ArrowIcon } from "@/components/icons";
 import { verdictTone, sentimentTone, TONE_CLASSES, pct } from "@/lib/tone";
 import { getTaxRateForCountry } from "@/lib/db/repo";
@@ -143,6 +144,8 @@ export default async function SchoolReport({ params, searchParams }: {
               ))}
             </div>
           </section>
+
+          <OfferInput slug={school.slug} currentOffer={offerAnalysis?.offeredMonthlyUsd} />
 
           <TanePanel slug={school.slug} offerMonthlyUsd={offerAnalysis?.offeredMonthlyUsd} />
 
