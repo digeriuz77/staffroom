@@ -66,20 +66,20 @@ export async function completeJob(id: string): Promise<void> {
 }
 
 /**
- * Mark a job failed; increment attempts, dead-letter if exceeded.
+ * Mark a job failed; dead-letter if max attempts exceeded.
+ * Note: `claim_next_job` already increments `attempts` at claim time,
+ * so we only check the current value — no double-increment.
  */
 export async function failJob(id: string, reason: string): Promise<void> {
   const client = supabaseServer();
   if (!client) return;
   const { data } = await client.from("jobs").select("attempts, max_attempts").eq("id", id).single();
   const row = data as { attempts: number; max_attempts: number } | null;
-  const attempts = (row?.attempts ?? 0) + 1;
-  const dead = attempts >= (row?.max_attempts ?? 5);
+  const dead = (row?.attempts ?? 1) >= (row?.max_attempts ?? 5);
   await client
     .from("jobs")
     .update({
       status: dead ? "dead" : "queued",
-      attempts,
       error: reason.slice(0, 500),
       locked_at: null,
     })

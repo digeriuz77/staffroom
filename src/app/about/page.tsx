@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
-import { totalRecordCount } from "@/lib/data/schools";
-import { deriveSchools } from "@/lib/data/schools";
-import { COST_OF_LIVING } from "@/lib/data/costOfLiving";
+import { getSchools, getColItems } from "@/lib/db/repo";
 
 export const metadata: Metadata = {
   title: "About — Staffroom Intel",
   description: "How Staffroom Intel works: real salary data, cost of living and Reddit sentiment for international teachers.",
 };
 
-export default function AboutPage() {
-  const salaries = totalRecordCount();
-  const schools = deriveSchools().length;
-  const cities = COST_OF_LIVING.length;
+export const dynamic = "force-dynamic";
+
+export default async function AboutPage() {
+  const [allSchools, colItems] = await Promise.all([getSchools(), getColItems()]);
+  const salaries = allSchools.reduce((sum, s) => sum + s.records.length, 0);
+  const schools = allSchools.length;
+  const cities = colItems.length;
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-12">

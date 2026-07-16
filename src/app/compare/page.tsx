@@ -31,16 +31,17 @@ export default async function ComparePage({
     .filter(Boolean)
     .slice(0, 3);
 
-  const entries: CompareEntry[] = [];
-  for (const slug of slugs) {
-    const report = await buildSalaryReportAsync(slug);
-    const taxRate = report ? await getTaxRateForCountry(report.school.country) : null;
-    entries.push({
-      slug,
-      report,
-      taxRate: taxRate ? { takeHomePct: taxRate.takeHomePct, taxRegime: taxRate.taxRegime } : null,
-    });
-  }
+  const entries: CompareEntry[] = await Promise.all(
+    slugs.map(async (slug) => {
+      const report = await buildSalaryReportAsync(slug);
+      const taxRate = report ? await getTaxRateForCountry(report.school.country) : null;
+      return {
+        slug,
+        report,
+        taxRate: taxRate ? { takeHomePct: taxRate.takeHomePct, taxRegime: taxRate.taxRegime } : null,
+      } satisfies CompareEntry;
+    }),
+  );
 
   const hasData = entries.some((e) => e.report);
 

@@ -123,10 +123,6 @@ export function deriveSchools(): DerivedSchool[] {
   return all;
 }
 
-export function getDerivedSchool(id: string): DerivedSchool | undefined {
-  return deriveSchools().find((s) => s.school.id === id);
-}
-
 export function getDerivedSchoolBySlug(slug: string): DerivedSchool | undefined {
   return deriveSchools().find((s) => s.school.slug === slug);
 }

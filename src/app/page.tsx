@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { PasteLink } from "@/components/PasteLink";
 import { CheckIcon, SparkIcon } from "@/components/icons";
-import { SALARIES } from "@/lib/data/schools";
-import { COST_OF_LIVING } from "@/lib/data/costOfLiving";
+import { getSchools, getColItems } from "@/lib/db/repo";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const salaries = SALARIES.length;
-  const schools = new Set(SALARIES.map((r) => `${r.school}|${r.city}|${r.country}`)).size;
-  const cities = COST_OF_LIVING.length;
+  const [allSchools, colItems] = await Promise.all([getSchools(), getColItems()]);
+  const salaries = allSchools.reduce((sum, s) => sum + s.records.length, 0);
+  const schools = allSchools.length;
+  const cities = colItems.length;
 
   return (
     <main className="min-h-screen">

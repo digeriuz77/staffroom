@@ -1,5 +1,5 @@
 import type { ColItem, ParsedJob, SalaryRecord, School } from "@/lib/types";
-import { unstable_cache, revalidatePath } from "next/cache";
+import { unstable_cache } from "next/cache";
 import {
   formatUsd,
   grossValues,
@@ -119,28 +119,19 @@ async function fetchSchoolReportData(slug: string): Promise<CachedSchoolData | n
  * Cached version of the base report data. Uses Next.js `unstable_cache`:
  * - On Vercel: persists in the Data Cache across requests/instances.
  * - Locally: in-memory per server instance.
- * - Invalidated via `invalidateSchoolCache()` when new salary data is approved.
+ * - Refreshed every 24h via the `revalidate` TTL.
  *
- * For a low-traffic app, broad invalidation (all school reports) on approval
- * is perfectly fine — it's infrequent and avoids per-key tag complexity.
+ * For a low-traffic app, the 24h TTL is the simplest correct invalidation
+ * strategy. If instant refresh on approval is needed later, add
+ * `revalidateTag("school-reports", profile)` with the correct Next 16 API.
  */
 export const getSchoolReportData = unstable_cache(
   fetchSchoolReportData,
   ["school-report"],
   {
-    revalidate: 86400, // 24h safety net
-    tags: ["school-reports"],
+    revalidate: 86400, // 24h
   },
 );
-
-/**
- * Invalidate all cached school reports. Call this when new salary data is
- * approved (from the moderation queue). For low-traffic apps, broad
- * invalidation is fine — approvals are infrequent.
- */
-export function invalidateSchoolCache(_slug?: string): void {
-  revalidatePath("/school/[slug]", "page");
-}
 
 /**
  * Compute offer analysis from cached report data + an offer amount. This is

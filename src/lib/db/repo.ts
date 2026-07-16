@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { supabaseEnabled, supabaseServer } from "@/lib/db/supabaseClients";
 import type {
   ColItemRow,
@@ -273,16 +274,20 @@ function rowToTaxRate(row: TaxRateRow): TaxRateEntry {
   };
 }
 
-export async function getTaxRateForCountry(country: string): Promise<TaxRateEntry> {
-  if (!supabaseEnabled()) {
+export const getTaxRateForCountry = unstable_cache(
+  async (country: string): Promise<TaxRateEntry> => {
+    if (!supabaseEnabled()) {
+      return getTaxRateStatic(country);
+    }
+    const client = supabaseServer()!;
+    const { data } = await client
+      .from("country_tax_rates")
+      .select("country, currency, effective_rate, social_insurance_rate, tax_regime, special_notes")
+      .ilike("country", country.trim())
+      .maybeSingle();
+    if (data) return rowToTaxRate(data as TaxRateRow);
     return getTaxRateStatic(country);
-  }
-  const client = supabaseServer()!;
-  const { data } = await client
-    .from("country_tax_rates")
-    .select("country, currency, effective_rate, social_insurance_rate, tax_regime, special_notes")
-    .ilike("country", country.trim())
-    .maybeSingle();
-  if (data) return rowToTaxRate(data as TaxRateRow);
-  return getTaxRateStatic(country);
-}
+  },
+  ["tax-rate"],
+  { revalidate: 86400 }, // tax rates change yearly — 24h cache is generous
+);

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseBrowser, supabaseServer } from "@/lib/db/supabaseClients";
+import { supabaseServer } from "@/lib/db/supabaseClients";
 import { resolveSchool } from "@/lib/db/schoolResolver";
 import type { SalarySubmissionInput } from "@/lib/submissions";
 
@@ -18,20 +18,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  // Require auth — the user must be signed in to submit.
+  // Require auth — validate the session token and extract the user ID.
   const authHeader = request.headers.get("authorization");
-  if (!authHeader) {
+  if (!authHeader?.startsWith("Bearer ")) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  }
-
-  // Validate required fields.
-  if (!body.schoolName?.trim() || !body.country?.trim() || !body.monthlySalaryUsd) {
-    return NextResponse.json({ error: "School name, country, and salary are required" }, { status: 400 });
   }
 
   const serverClient = supabaseServer();
   if (!serverClient) {
     return NextResponse.json({ error: "Database not configured" }, { status: 503 });
+  }
+
+  const token = authHeader.slice(7);
+  const { data: session, error: sessionErr } = await serverClient.auth.getUser(token);
+  if (sessionErr || !session.user) {
+    return NextResponse.json({ error: "Invalid or expired session" }, { status: 401 });
+  }
+  const userId = session.user.id;
+
+  // Validate required fields.
+  if (!body.schoolName?.trim() || !body.country?.trim() || !body.monthlySalaryUsd) {
+    return NextResponse.json({ error: "School name, country, and salary are required" }, { status: 400 });
   }
 
   // 1. Resolve the school: attach to existing school_id or create new.
@@ -84,6 +91,7 @@ export async function POST(request: Request) {
     source: "user_submit",
     trust_tier: "email",
     status: "pending",
+    submitter_id: userId,
   }).select("id").single();
 
   if (error) {
@@ -98,6 +106,3 @@ export async function POST(request: Request) {
     message: "Submission received — pending moderator review.",
   });
 }
-
-/** Keep the browser client import referenced for potential future auth-bound writes. */
-void supabaseBrowser;

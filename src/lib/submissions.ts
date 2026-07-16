@@ -9,7 +9,6 @@ import type {
   SalaryRecordRow,
   TrustTier,
 } from "@/lib/db/types";
-import type { DbClient } from "@/lib/db/supabaseClients";
 
 const TIER_POINTS: Record<TrustTier, number> = {
   seed: 0,
@@ -36,37 +35,6 @@ export interface SalarySubmissionInput {
   managementRole: boolean;
   tenureYears: number | null;
   package?: SalaryPackageFields;
-}
-
-export async function submitSalary(
-  client: DbClient,
-  userId: string,
-  input: SalarySubmissionInput,
-): Promise<{ error: string | null; id: string | null }> {
-  const netMonthly = input.taxRate != null ? input.monthlySalaryUsd * (1 - input.taxRate) : input.monthlySalaryUsd;
-  const { data, error } = await client.from("salary_records").insert({
-    year: input.year,
-    country: input.country,
-    city: input.city,
-    school: input.schoolName,
-    role: input.role,
-    management_role: input.managementRole,
-    tenure_years: input.tenureYears,
-    currency: input.currency,
-    monthly_salary_usd: input.monthlySalaryUsd,
-    net_monthly_usd: netMonthly,
-    net_annual_usd: netMonthly * 12,
-    tax_rate: input.taxRate,
-    housing: input.housing,
-    flights: input.flights,
-    package: (input.package ?? {}) as Record<string, unknown>,
-    source: "user_submit",
-    trust_tier: "email",
-    status: "pending",
-    submitter_id: userId,
-  }).select("id").single();
-  if (error) return { error: error.message, id: null };
-  return { error: null, id: (data as { id: string }).id };
 }
 
 // ---------------------------------------------------------------------------
@@ -116,23 +84,9 @@ export async function approveSalarySubmission(
     console.error(`[approveSalary] bounty fulfillment failed for ${submissionId}: ${bountyErr}`);
   }
 
-  // Invalidate the cached school report so the new data appears immediately.
-  if (sub.school_id) {
-    const { data: schoolRow } = await client
-      .from("schools")
-      .select("slug")
-      .eq("id", sub.school_id)
-      .maybeSingle();
-    const slug = (schoolRow as { slug: string } | null)?.slug;
-    if (slug) {
-      try {
-        const { invalidateSchoolCache } = await import("@/lib/analysis/salary");
-        invalidateSchoolCache(slug);
-      } catch {
-        // Cache invalidation is best-effort — the 24h TTL will catch it.
-      }
-    }
-  }
+  // Note: cached school reports refresh via the 24h TTL on getSchoolReportData.
+  // If instant refresh is needed later, add revalidateTag here with the
+  // correct Next 16 cache-life profile API.
 
   return { error: null };
 }
