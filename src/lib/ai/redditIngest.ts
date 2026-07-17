@@ -96,6 +96,7 @@ async function storeSweepPosts(
   dir: SchoolDirEntry[],
 ): Promise<number> {
   let stored = 0;
+  const fetchedAt = new Date().toISOString();
   for (const p of posts) {
     const text = `${p.title ?? ""} ${p.body ?? ""}`;
     const schoolId = resolveSchoolFromText(text, dir);
@@ -106,7 +107,9 @@ async function storeSweepPosts(
       title: p.title ?? null,
       body: p.body ?? null,
       author: p.author,
+      score: p.upvotes ?? null,
       created_at: new Date(p.date).toISOString(),
+      fetched_at: fetchedAt,
       sentiment_score: p.score,
       themes: p.themes,
     };
@@ -128,6 +131,7 @@ async function storePosts(
   schoolId: string | null,
 ): Promise<number> {
   let stored = 0;
+  const fetchedAt = new Date().toISOString();
   for (const p of posts) {
     const row = {
       id: p.id,
@@ -136,7 +140,9 @@ async function storePosts(
       title: p.title ?? null,
       body: p.body ?? null,
       author: p.author,
+      score: p.upvotes ?? null,
       created_at: new Date(p.date).toISOString(),
+      fetched_at: fetchedAt,
       sentiment_score: p.score,
       themes: p.themes,
     };

@@ -31,7 +31,7 @@ export function PasteLink({
   return (
     <div className="w-full">
       {/* Mode tabs */}
-      <div className="mb-4 flex justify-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
+      <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
         <ModeTab active={mode === "link"} onClick={() => setMode("link")} label="Paste a link" />
         <ModeTab active={mode === "text"} onClick={() => setMode("text")} label="Paste job text" />
         <ModeTab active={mode === "manual"} onClick={() => setMode("manual")} label="Enter manually" />
@@ -47,8 +47,9 @@ export function PasteLink({
 function ModeTab({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+      className={`min-h-11 rounded-lg px-2 py-2 text-xs font-medium leading-tight transition sm:px-4 sm:text-sm ${
         active
           ? "bg-indigo-500/20 text-indigo-200"
           : "text-slate-400 hover:text-white"
@@ -102,8 +103,8 @@ function LinkMode({
 
   return (
     <div>
-      <form onSubmit={handleAnalyze} className="relative">
-        <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+      <form onSubmit={handleAnalyze} className="relative flex flex-col gap-3 sm:block">
+        <div className="pointer-events-none absolute left-4 top-[18px] text-slate-500">
           <LinkIcon className="h-5 w-5" />
         </div>
         <input
@@ -111,12 +112,12 @@ function LinkMode({
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Paste a job link from tes.com, Teacher Horizons, Search Associates..."
-          className="w-full rounded-2xl border border-white/10 bg-white/5 py-4 pl-12 pr-36 text-base text-white placeholder:text-slate-500 outline-none transition focus:border-indigo-400/50 focus:bg-white/[0.07] focus:ring-2 focus:ring-indigo-500/20"
+          className="w-full min-w-0 rounded-2xl border border-white/10 bg-white/5 py-4 pl-12 pr-4 text-base text-white placeholder:text-slate-500 outline-none transition focus:border-indigo-400/50 focus:bg-white/[0.07] focus:ring-2 focus:ring-indigo-500/20 sm:pr-36"
         />
         <button
           type="submit"
           disabled={loading || !url.trim()}
-          className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:absolute sm:right-2 sm:top-2 sm:min-h-0 sm:w-auto"
         >
           {loading ? "Analyzing..." : "Analyze"}
           {!loading && <ArrowIcon className="h-4 w-4" />}
@@ -135,8 +136,9 @@ function LinkMode({
         {EXAMPLES.map((ex) => (
           <button
             key={ex}
+            type="button"
             onClick={() => setUrl(ex)}
-            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400 transition hover:border-indigo-400/30 hover:text-indigo-300"
+            className="min-h-10 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400 transition hover:border-indigo-400/30 hover:text-indigo-300"
           >
             {extractHost(ex)}
           </button>

@@ -166,3 +166,19 @@ Teacher opens school report → `/api/sentiment` → serves cached `reddit_posts
 - `DEPLOYMENT.md` — full deployment guide (Vercel + Supabase + Railway)
 - `ROADMAP.md` — future features classified by feasibility + impact
 - `ASSESSMENT.md` — developer goal-alignment review (honest assessment)
+
+## 2026-07-17 Session — Demand-aware growth, low-cost AI, and focused UX
+
+- **Database flywheel:** migration `0011_growth_and_agent.sql` adds aggregate school interest, unresolved discovery requests, cached school briefs, embedding provenance, targeted indexes, and bounded retention. School searches now prioritize background discovery, while report views record aggregate demand.
+- **Reliable write-through:** Next `after()` now guarantees post-response Reddit persistence and queue work. Existing posts refresh `fetched_at`; live upserts retain scores. Targeted fetches trigger embedding, clustering, and brief jobs.
+- **Corpus quality:** school relevance requires a full name or multiple distinctive tokens. `db:seed` now reconciles Reddit bootstrap data after schools exist and rejects location-only false matches.
+- **Embeddings:** provider-aware Google, Pinecone Inference, and OpenAI-compatible clients validate dimensions and record provider/model provenance. Google `gemini-embedding-001` at 1536 dimensions is the recommended path; Pinecone's smaller vectors are cosine-preserving zero-padded into the existing Supabase pgvector column.
+- **Low-cost agent:** optional Gemini Flash-Lite background jobs create cached, evidence-grounded school briefs only when the source corpus changes. Public text is treated as untrusted prompt data. No chatbot or per-page LLM call was added.
+- **Worker cost:** `bun worker:once` drains a bounded queue batch for scheduled/serverless operation, avoiding an always-on worker at low traffic. The continuous worker remains available.
+- **UX:** responsive mobile navigation, stacked mobile analysis input, concise home hierarchy, searchable/filtered school directory, collapsed salary evidence, sentiment previews, and progressive disclosure for research details.
+- **Privacy:** public full-profile reads were removed; leaderboards now include only opted-in public profiles.
+- **Validation:** 85 unit tests pass, with new coverage for embedding safety, Reddit relevance, and AI brief parsing. Typecheck and lint pass.
+
+### Deployment requirement
+
+Apply migration `0011_growth_and_agent.sql`, then run `bun db:seed`. Configure `EMBEDDINGS_PROVIDER=google` with `GOOGLE_AI_API_KEY` for the recommended free/low-cost semantic path. The same key enables evidence briefs unless `AI_AGENT_API_KEY` overrides it.

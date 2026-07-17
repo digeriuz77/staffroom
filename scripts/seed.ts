@@ -8,6 +8,8 @@ import { createClient } from "@supabase/supabase-js";
 import { SALARIES, slugify } from "../src/lib/data/schools";
 import { COST_OF_LIVING } from "../src/lib/data/costOfLiving";
 import { codeOfCountry, regionOfCountry } from "../src/lib/data/geo";
+import redditSeedPosts from "../src/lib/data/reddit_seed_posts.json";
+import { isRelevantSchoolMention } from "../src/lib/reddit/client";
 import type {
   CurriculumTag,
   HousingType,
@@ -30,6 +32,18 @@ interface SchoolInsert {
   country_code: string;
   region: string;
   curricula: CurriculumTag[];
+}
+
+interface RedditSeedPost {
+  id: string;
+  school_slug: string;
+  subreddit: string;
+  title: string;
+  body: string;
+  author: string;
+  created_at: string;
+  sentiment_score: number;
+  themes: string[];
 }
 
 function buildSchools(): Map<string, SchoolInsert> {
@@ -143,6 +157,53 @@ async function seed() {
   if (colErr) {
     console.error("col insert failed:", colErr.message);
     process.exit(1);
+  }
+
+  // 5. Reconcile the optional Reddit bootstrap after schools exist. Only keep
+  //    posts that actually mention the assigned school; location-only matches
+  //    would contaminate every downstream summary and embedding.
+  const redditSeeds = redditSeedPosts as RedditSeedPost[];
+  await client
+    .from("reddit_posts")
+    .delete()
+    .in("id", redditSeeds.map((post) => post.id));
+  const redditPayload = redditSeeds.flatMap((post) => {
+    const school = schools.get(post.school_slug);
+    const schoolId = slugToId.get(post.school_slug);
+    if (
+      !school ||
+      !schoolId ||
+      !isRelevantSchoolMention(
+        school.name,
+        `${post.title} ${post.body}`,
+      )
+    ) {
+      return [];
+    }
+    return [{
+      id: post.id,
+      school_id: schoolId,
+      subreddit: post.subreddit,
+      title: post.title,
+      body: post.body,
+      author: post.author,
+      created_at: post.created_at,
+      fetched_at: new Date().toISOString(),
+      sentiment_score: post.sentiment_score,
+      themes: post.themes,
+    }];
+  });
+  console.log(
+    `Inserting ${redditPayload.length}/${redditSeeds.length} relevant Reddit seed posts...`,
+  );
+  if (redditPayload.length > 0) {
+    const { error: redditErr } = await client
+      .from("reddit_posts")
+      .insert(redditPayload);
+    if (redditErr) {
+      console.error("Reddit seed insert failed:", redditErr.message);
+      process.exit(1);
+    }
   }
 
   console.log("Seed complete.");

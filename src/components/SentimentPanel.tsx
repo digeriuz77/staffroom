@@ -125,11 +125,33 @@ export function SentimentPanel({ schoolId, schoolName }: Props) {
       ) : (
         <>
           <SentimentMeter avg={avg} />
-          <div className="mt-5 space-y-3">
-            {posts.map((p) => (
-              <PostCard key={p.id} post={p} />
-            ))}
+          <div className="mt-5">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">
+              Evidence preview
+            </p>
+            <div className="space-y-3">
+              {posts.slice(0, 2).map((p) => (
+                <PostCard key={p.id} post={p} compact />
+              ))}
+            </div>
           </div>
+
+          <details className="group mt-4">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-indigo-400/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 [&::-webkit-details-marker]:hidden">
+              View all {posts.length} source post{posts.length === 1 ? "" : "s"}
+              <span
+                className="ml-3 text-lg leading-none text-slate-500 transition group-open:rotate-45 group-open:text-indigo-300"
+                aria-hidden="true"
+              >
+                +
+              </span>
+            </summary>
+            <div className="mt-3 space-y-3">
+              {posts.map((p) => (
+                <PostCard key={p.id} post={p} />
+              ))}
+            </div>
+          </details>
         </>
       )}
     </div>
@@ -183,13 +205,13 @@ function SentimentMeter({ avg }: { avg: number }) {
   );
 }
 
-function PostCard({ post }: { post: SentimentPost }) {
+function PostCard({ post, compact = false }: { post: SentimentPost; compact?: boolean }) {
   const tone =
     post.score >= 0.12 ? "border-emerald-500/20 bg-emerald-500/[0.04]" : post.score >= -0.12 ? "border-white/10 bg-white/[0.02]" : "border-rose-500/20 bg-rose-500/[0.04]";
   return (
     <div className={`rounded-xl border p-4 ${tone}`}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <SourceIcon source={post.source} className="h-4 w-4 text-slate-500" />
           <span className="text-xs font-medium text-slate-300">{post.author}</span>
           {post.subreddit && <span className="text-xs text-slate-500">{post.subreddit}</span>}
@@ -200,8 +222,10 @@ function PostCard({ post }: { post: SentimentPost }) {
         )}
       </div>
       {post.title && <p className="mt-2 text-sm font-medium text-white">{post.title}</p>}
-      <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{post.body}</p>
-      {post.themes.length > 0 && (
+      <p className={`mt-1.5 break-words text-sm leading-relaxed text-slate-400 ${compact ? "line-clamp-3" : ""}`}>
+        {post.body}
+      </p>
+      {!compact && post.themes.length > 0 && (
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           {post.themes.map((t) => (
             <span key={t} className="rounded-md bg-white/5 px-2 py-0.5 text-[11px] text-slate-400">

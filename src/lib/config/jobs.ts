@@ -83,11 +83,60 @@ export const TURNOVER_THEMES = ["Management", "Workload", "Pay", "Turnover"] as 
 /** Embeddings model dimensions (must match the vector(1536) column). */
 export const EMBEDDING_DIM = 1536;
 
+export type EmbeddingsProviderKind = "openai" | "google" | "pinecone";
+
 export function embeddingsConfig() {
+  const explicit = process.env.EMBEDDINGS_PROVIDER?.toLowerCase();
+  const provider: EmbeddingsProviderKind =
+    explicit === "google" || explicit === "pinecone" || explicit === "openai"
+      ? explicit
+      : process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY
+        ? "google"
+        : process.env.PINECONE_API_KEY
+          ? "pinecone"
+          : "openai";
+
+  const defaults = {
+    openai: {
+      baseUrl: "https://api.openai.com/v1",
+      model: "text-embedding-3-small",
+      apiKey: process.env.EMBEDDINGS_API_KEY ?? "",
+    },
+    google: {
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      model: "gemini-embedding-001",
+      apiKey:
+        process.env.GOOGLE_AI_API_KEY ??
+        process.env.GEMINI_API_KEY ??
+        process.env.EMBEDDINGS_API_KEY ??
+        "",
+    },
+    pinecone: {
+      baseUrl: "https://api.pinecone.io",
+      model: "llama-text-embed-v2",
+      apiKey: process.env.PINECONE_API_KEY ?? process.env.EMBEDDINGS_API_KEY ?? "",
+    },
+  }[provider];
+
   return {
-    baseUrl: process.env.EMBEDDINGS_BASE_URL ?? "https://api.openai.com/v1",
-    model: process.env.EMBEDDINGS_MODEL ?? "text-embedding-3-small",
-    apiKey: process.env.EMBEDDINGS_API_KEY ?? "",
+    provider,
+    baseUrl: process.env.EMBEDDINGS_BASE_URL ?? defaults.baseUrl,
+    model: process.env.EMBEDDINGS_MODEL ?? defaults.model,
+    apiKey: defaults.apiKey,
+  };
+}
+
+export function agentConfig() {
+  return {
+    apiKey:
+      process.env.AI_AGENT_API_KEY ??
+      process.env.GOOGLE_AI_API_KEY ??
+      process.env.GEMINI_API_KEY ??
+      "",
+    baseUrl:
+      process.env.AI_AGENT_BASE_URL ??
+      "https://generativelanguage.googleapis.com/v1beta",
+    model: process.env.AI_AGENT_MODEL ?? "gemini-3.1-flash-lite",
   };
 }
 

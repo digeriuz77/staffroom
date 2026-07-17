@@ -94,13 +94,20 @@ export function rowToColItem(row: ColItemRow): ColItem {
  * Batch-load all approved salary records and group by school_id, avoiding an
  * N+1 query when assembling multiple DerivedSchool entries.
  */
-async function loadRecordsBySchool(): Promise<Map<string, SalaryRecord[]>> {
+async function loadRecordsBySchool(
+  schoolIds?: string[],
+): Promise<Map<string, SalaryRecord[]>> {
   const client = supabaseServer();
   if (!client) return new Map();
-  const { data, error } = await client
+  let query = client
     .from("salary_records")
     .select("*")
     .eq("status", "approved");
+  if (schoolIds) {
+    if (schoolIds.length === 0) return new Map();
+    query = query.in("school_id", schoolIds);
+  }
+  const { data, error } = await query;
   if (error || !data) return new Map();
   const bySchool = new Map<string, SalaryRecord[]>();
   for (const row of (data as SalaryRecordRow[]) ?? []) {
@@ -123,11 +130,18 @@ export async function getSchools(): Promise<DerivedSchool[]> {
   }
   const client = supabaseServer()!;
   const { data: schools, error } = await client.from("schools").select("*");
-  if (error || !schools) return [];
+  if (error || !schools || schools.length === 0) return deriveSchools();
   const recordsBySchool = await loadRecordsBySchool();
   const out: DerivedSchool[] = (schools as SchoolRow[]).map((s) => {
     const records = recordsBySchool.get(s.id) ?? [];
-    return { school: rowToSchool(s, records.length), records };
+    return {
+      school: rowToSchool(
+        s,
+        records.length,
+        records.map((record) => record.year),
+      ),
+      records,
+    };
   });
   out.sort(
     (a, b) =>
@@ -147,10 +161,17 @@ export async function getSchoolBySlug(slug: string): Promise<DerivedSchool | nul
     .select("*")
     .eq("slug", slug)
     .maybeSingle();
-  if (!data) return null;
+  if (!data) return getDerivedSchoolBySlug(slug) ?? null;
   const school = data as SchoolRow;
   const records = await getSalaryRecordsForSchool(school.id);
-  return { school: rowToSchool(school, records.length), records };
+  return {
+    school: rowToSchool(
+      school,
+      records.length,
+      records.map((record) => record.year),
+    ),
+    records,
+  };
 }
 
 export async function searchSchools(query: string): Promise<DerivedSchool[]> {
@@ -159,23 +180,37 @@ export async function searchSchools(query: string): Promise<DerivedSchool[]> {
   }
   const client = supabaseServer()!;
   const q = query.trim();
+  const safeQuery = q
+    .replace(/[(),.%]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
   let data: SchoolRow[] | null = null;
-  if (q) {
+  if (safeQuery) {
     const { data: rows } = await client
       .from("schools")
       .select("*")
-      .or(`name.ilike.%${q}%,city.ilike.%${q}%,country.ilike.%${q}%`)
+      .or(
+        `name.ilike.%${safeQuery}%,city.ilike.%${safeQuery}%,country.ilike.%${safeQuery}%`,
+      )
       .limit(40);
     data = (rows as SchoolRow[]) ?? null;
   } else {
     const { data: rows } = await client.from("schools").select("*").limit(40);
     data = (rows as SchoolRow[]) ?? null;
   }
-  if (!data) return [];
-  const recordsBySchool = await loadRecordsBySchool();
+  if (!data || data.length === 0) return searchDerivedSchools(q);
+  const recordsBySchool = await loadRecordsBySchool(data.map((school) => school.id));
   const out: DerivedSchool[] = data.map((s) => {
     const records = recordsBySchool.get(s.id) ?? [];
-    return { school: rowToSchool(s, records.length), records };
+    return {
+      school: rowToSchool(
+        s,
+        records.length,
+        records.map((record) => record.year),
+      ),
+      records,
+    };
   });
   return out;
 }
@@ -255,7 +290,15 @@ async function fetchSchoolDirectory(): Promise<SchoolLite[]> {
   }
   const client = supabaseServer()!;
   const { data } = await client.from("schools").select("id, slug, name, city, country");
-  return ((data as SchoolLite[]) ?? []);
+  const schools = (data as SchoolLite[]) ?? [];
+  if (schools.length > 0) return schools;
+  return deriveSchools().map(({ school }) => ({
+    id: school.id,
+    slug: school.slug,
+    name: school.name,
+    city: school.city,
+    country: school.country,
+  }));
 }
 
 /** Cached slim directory of all schools — used by the job-link matcher. */
@@ -277,7 +320,8 @@ export async function getColItems(): Promise<ColItem[]> {
   }
   const client = supabaseServer()!;
   const { data } = await client.from("col_items").select("*");
-  return ((data as ColItemRow[]) ?? []).map(rowToColItem);
+  const rows = (data as ColItemRow[]) ?? [];
+  return rows.length > 0 ? rows.map(rowToColItem) : COST_OF_LIVING;
 }
 
 export async function getColNearest(city: string, country: string): Promise<ColItem | undefined> {

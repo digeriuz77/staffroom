@@ -180,6 +180,7 @@ export async function leaderboard(limit = 20): Promise<{ id: string; display_nam
   const { data } = await client
     .from("profiles")
     .select("id, display_name, reputation_points")
+    .eq("public_profile", true)
     .order("reputation_points", { ascending: false })
     .limit(limit);
   return (data as { id: string; display_name: string | null; reputation_points: number }[]) ?? [];

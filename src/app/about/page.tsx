@@ -46,11 +46,18 @@ export default async function AboutPage() {
 
         <h2 className="text-lg font-semibold text-white">Social sentiment</h2>
         <p>
-          A background worker fetches Reddit posts from international teaching subreddits, stores them with semantic
-          embeddings (pgvector), and clusters them into themes per school: Pay, Management, Housing, Workload,
-          Turnover, Culture. The school report shows the stored corpus with theme summaries and a turnover signal
-          that correlates posting frequency with sentiment shifts. Live Reddit fills gaps when the stored corpus
-          is thin. The more teachers who contribute and discuss, the richer this becomes.
+          School searches and report views tell the background pipeline where evidence is most useful. Public
+          discussions are stored once, deduplicated, refreshed when stale, and grouped into themes such as Pay,
+          Management, Housing, Workload, Turnover, and Culture. Lexicon analysis works without any paid AI service;
+          optional semantic embeddings improve grouping when a provider is configured.
+        </p>
+
+        <h2 className="text-lg font-semibold text-white">A small, careful AI role</h2>
+        <p>
+          The AI is an evidence steward, not a chatbot. When enough fresh evidence exists, a low-cost background
+          model creates a concise brief of repeated signals, watchouts, and questions to ask the school. It runs
+          only when the underlying corpus changes. Briefs are clearly labelled, grounded in the displayed evidence,
+          and never treated as verified fact.
         </p>
 
         <h2 className="text-lg font-semibold text-white">The Staffroom Board</h2>

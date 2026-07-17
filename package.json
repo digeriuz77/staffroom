@@ -12,7 +12,8 @@
     "db:seed": "bun run scripts/seed.ts",
     "db:parity": "bun run scripts/parity-check.ts",
     "embed:posts": "bun run scripts/embed-posts.ts",
-    "worker": "bun run worker/index.ts"
+    "worker": "bun run worker/index.ts",
+    "worker:once": "bun run worker/runOnce.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.2",

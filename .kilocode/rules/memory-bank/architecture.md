@@ -72,3 +72,15 @@ src/
 - `useState` for local client state (salary slider, search query)
 - Server Components for all data fetching and report building
 - No global state library needed yet
+
+## Demand-Aware Growth and AI (2026-07-17)
+
+- `/api/schools` records aggregate demand for matched schools and unresolved queries, then enqueues targeted discovery for the top results.
+- `/api/sentiment` is DB-first and freshness-aware. Next `after()` guarantees write-through persistence and post-response queue work in serverless deployments.
+- `school_interest` prioritizes data-gap bounties; `discovery_requests` preserves demand for schools not yet in the directory.
+- Embeddings stay in Supabase pgvector. Providers are swappable (`google`, `pinecone`, `openai`), dimension-checked, normalized, and tagged with provider/model provenance.
+- `school_briefs` caches optional Gemini-generated evidence briefs. The agent runs only after evidence changes and produces bounded summary, strength, watchout, and interview-question fields.
+- Worker modes:
+  - `bun worker` continuously polls the Postgres queue.
+  - `bun worker:once` drains a bounded batch for scheduled low-cost deployments.
+- UI uses progressive disclosure: the verdict and evidence brief lead, while raw salary records, full sentiment posts, and research checks stay collapsed until requested.

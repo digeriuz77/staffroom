@@ -20,7 +20,7 @@ async function main() {
   }
   if (!hasEmbeddingsProvider()) {
     console.error(
-      "Missing EMBEDDINGS_API_KEY. Set it to embed posts (OpenAI-compatible).",
+      "Missing embeddings key. Configure Google, Pinecone, or an OpenAI-compatible provider.",
     );
     console.error("Until then, clustering runs in lexicon mode — theme_clusters still populate.");
     process.exit(1);

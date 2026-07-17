@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { searchSchoolOnReddit } from "@/lib/reddit/client";
 import { staticSentimentFor } from "@/lib/data/sentiment";
 import { supabaseEnabled, supabaseServer } from "@/lib/db/supabaseClients";
@@ -6,6 +6,7 @@ import { latestTurnoverSignal } from "@/lib/analysis/turnover";
 import { enqueue } from "@/lib/db/queue";
 import { persistPostsForSchool } from "@/lib/ai/redditIngest";
 import { aggregateThemesFromPosts } from "@/lib/ai/clustering";
+import { recordSchoolInterest } from "@/lib/db/interest";
 import type { RedditPostRow, ThemeClusterRow } from "@/lib/db/types";
 import type { SentimentPost } from "@/lib/types";
 
@@ -128,6 +129,7 @@ export async function POST(request: Request) {
   let turnover: TurnoverSummary | null = null;
   let redditStatus: "stored" | "live" | "fallback" | "unavailable" = "unavailable";
   let redditReason: string | undefined;
+  let livePostsForPersistence: SentimentPost[] = [];
 
   const useStored = supabaseEnabled() && UUID_RE.test(schoolId);
   const today = new Date().toISOString().slice(0, 10);
@@ -161,23 +163,7 @@ export async function POST(request: Request) {
       redditStatus = reddit.posts.length > 0 ? "live" : "fallback";
     }
     if (useStored && reddit.posts.length > 0) {
-      // Persist immediately — the corpus compounds as teachers browse. Fire and
-      // forget so latency stays low; the response already carries these posts.
-      void persistPostsForSchool(reddit.posts, schoolId).catch((e) =>
-        console.warn(`[sentiment] persist: ${e instanceof Error ? e.message : e}`),
-      );
-      // Background deepening: a targeted sweep for this school + a re-cluster so
-      // theme_clusters catches up. Deduped per school per day.
-      void enqueue(
-        "reddit_fetch",
-        { schoolName, schoolId },
-        { dedupeKey: `reddit-school-${schoolId}-${today}` },
-      );
-      void enqueue(
-        "cluster",
-        { schoolId },
-        { dedupeKey: `cluster-school-${schoolId}-${today}` },
-      );
+      livePostsForPersistence = reddit.posts;
     }
     const known = new Set(posts.map((p) => p.id));
     posts = [...posts, ...reddit.posts.filter((p) => !known.has(p.id))].slice(0, 12);
@@ -196,6 +182,37 @@ export async function POST(request: Request) {
   if (posts.length < 3) {
     const fallback = staticSentimentFor(schoolName).map((p) => ({ ...p, school: schoolName }));
     posts = [...posts, ...fallback].slice(0, 12);
+  }
+
+  if (useStored) {
+    const evidenceCount = posts.filter((post) => post.provenance !== "static").length;
+    after(async () => {
+      await recordSchoolInterest([schoolId], "view");
+      if (livePostsForPersistence.length > 0) {
+        await persistPostsForSchool(livePostsForPersistence, schoolId);
+      }
+      if (stale) {
+        await Promise.all([
+          enqueue(
+            "reddit_fetch",
+            { schoolName, schoolId },
+            { dedupeKey: `reddit-school-${schoolId}-${today}` },
+          ),
+          enqueue(
+            "cluster",
+            { schoolId },
+            { dedupeKey: `cluster-school-${schoolId}-${today}` },
+          ),
+        ]);
+      }
+      if (evidenceCount >= 3) {
+        await enqueue(
+          "brief",
+          { schoolId },
+          { dedupeKey: `brief-school-${schoolId}-${today}` },
+        );
+      }
+    });
   }
 
   return NextResponse.json({

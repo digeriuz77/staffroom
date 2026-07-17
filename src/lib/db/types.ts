@@ -16,7 +16,8 @@ export type JobType =
   | "baseline"
   | "turnover"
   | "fx"
-  | "gap_detect";
+  | "gap_detect"
+  | "brief";
 export type BountyStatus = "open" | "filled" | "closed";
 export type BountyKind = "salary" | "col" | "management" | "benefits" | "tenure";
 export type UserRole = "member" | "moderator" | "admin";
@@ -164,6 +165,8 @@ export interface RedditPostRow {
   sentiment_score: number | null;
   themes: string[];
   embedding: number[] | null;
+  embedding_provider: string | null;
+  embedding_model: string | null;
 }
 
 export interface ThemeClusterRow {
@@ -176,6 +179,37 @@ export interface ThemeClusterRow {
   window_start: string;
   window_end: string;
   computed_at: string;
+}
+
+export interface SchoolInterestRow {
+  school_id: string;
+  searches: number;
+  views: number;
+  last_searched_at: string | null;
+  last_viewed_at: string | null;
+  updated_at: string;
+}
+
+export interface DiscoveryRequestRow {
+  query_key: string;
+  display_query: string;
+  searches: number;
+  resolved_school_id: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+}
+
+export interface SchoolBriefRow {
+  id: string;
+  school_id: string;
+  summary: string;
+  strengths: string[];
+  watchouts: string[];
+  questions: string[];
+  source_post_count: number;
+  source_updated_at: string | null;
+  model: string;
+  generated_at: string;
 }
 
 export interface JobPostingRow {
@@ -314,6 +348,9 @@ export interface Database {
       school_fee_tiers: Table<SchoolFeeTierRow>;
       reddit_posts: Table<RedditPostRow>;
       theme_clusters: Table<ThemeClusterRow>;
+      school_interest: Table<SchoolInterestRow>;
+      discovery_requests: Table<DiscoveryRequestRow>;
+      school_briefs: Table<SchoolBriefRow>;
       job_postings: Table<JobPostingRow>;
       posting_baselines: Table<PostingBaselineRow>;
       turnover_signals: Table<TurnoverSignalRow>;
@@ -335,6 +372,15 @@ export interface Database {
         Args: { p_id: string; p_vec: number[] };
         Returns: void;
       };
+      set_post_embedding_v2: {
+        Args: {
+          p_id: string;
+          p_vec: number[];
+          p_provider: string;
+          p_model: string;
+        };
+        Returns: void;
+      };
       increment_reputation: {
         Args: { p_user: string; p_points: number };
         Returns: void;
@@ -350,6 +396,21 @@ export interface Database {
       expire_board_posts: {
         Args: Record<string, never>;
         Returns: number;
+      };
+      record_school_interest: {
+        Args: { p_school_id: string; p_kind: "search" | "view" };
+        Returns: void;
+      };
+      record_school_interest_batch: {
+        Args: {
+          p_school_ids: string[];
+          p_kind: "search" | "view";
+        };
+        Returns: void;
+      };
+      record_discovery_request: {
+        Args: { p_query: string };
+        Returns: void;
       };
     };
     Enums: Record<string, string>;

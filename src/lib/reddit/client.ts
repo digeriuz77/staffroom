@@ -161,6 +161,38 @@ function buildQueries(schoolName: string): string[] {
   ];
 }
 
+const GENERIC_SCHOOL_WORDS = new Set([
+  "the",
+  "of",
+  "and",
+  "international",
+  "school",
+  "schools",
+  "college",
+  "academy",
+  "institute",
+]);
+
+function normalizeForMatch(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+export function isRelevantSchoolMention(
+  schoolName: string,
+  postText: string,
+): boolean {
+  const school = normalizeForMatch(schoolName);
+  const text = normalizeForMatch(postText);
+  if (!school || !text) return false;
+  if (text.includes(school)) return true;
+
+  const distinctive = school
+    .split(" ")
+    .filter((token) => token.length > 2 && !GENERIC_SCHOOL_WORDS.has(token));
+  if (distinctive.length < 2) return false;
+  return distinctive.every((token) => text.includes(token));
+}
+
 export interface RedditSearchResult {
   posts: SentimentPost[];
   source: "live" | "unavailable";
@@ -246,8 +278,8 @@ export async function searchSchoolOnReddit(schoolName: string, limit = 8): Promi
         const id = d?.id;
         if (!id || seen.has(id)) continue;
         seen.add(id);
-        const text = `${d.title ?? ""} ${d.selftext ?? ""}`.toLowerCase();
-        if (!text.includes(schoolName.toLowerCase().split(" ")[0].toLowerCase())) continue;
+        const text = `${d.title ?? ""} ${d.selftext ?? ""}`;
+        if (!isRelevantSchoolMention(schoolName, text)) continue;
         collected.push(toSentimentPost(child));
         if (collected.length >= limit) break;
       }

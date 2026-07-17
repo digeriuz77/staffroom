@@ -12,6 +12,8 @@ import { CompareButton } from "@/components/CompareButton";
 import { ArrowIcon } from "@/components/icons";
 import { verdictTone, sentimentTone, TONE_CLASSES, pct } from "@/lib/tone";
 import { getTaxRateForCountry } from "@/lib/db/repo";
+import { getSchoolBrief } from "@/lib/db/interest";
+import type { SchoolBriefRow } from "@/lib/db/types";
 import type { Metadata } from "next";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -40,7 +42,10 @@ export default async function SchoolReport({ params, searchParams }: {
   if (!report) notFound();
 
   const { school, schoolStats, countryStats, regionStats, histogram, col, offer: offerAnalysis, records } = report;
-  const taxRate = await getTaxRateForCountry(school.country);
+  const [taxRate, brief] = await Promise.all([
+    getTaxRateForCountry(school.country),
+    getSchoolBrief(school.id),
+  ]);
   const vTone = offerAnalysis ? verdictTone(offerAnalysis.verdict) : null;
   const vClasses = vTone ? TONE_CLASSES[vTone] : null;
   const lo = Math.min(countryStats.min, regionStats.min);
@@ -63,7 +68,9 @@ export default async function SchoolReport({ params, searchParams }: {
         </div>
         <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">{school.name}</h1>
         <p className="mt-2 text-sm text-slate-400">
-          {records.length} real salary record{records.length !== 1 ? "s" : ""} · data from {Math.min(...school.years)}–{Math.max(...school.years)}
+          {records.length} real salary record{records.length !== 1 ? "s" : ""}
+          {school.years.length > 0 &&
+            ` · data from ${Math.min(...school.years)}–${Math.max(...school.years)}`}
         </p>
         <div className="mt-3 flex gap-2">
           <CompareButton slug={school.slug} name={school.name} city={school.city} country={school.country} />
@@ -99,6 +106,8 @@ export default async function SchoolReport({ params, searchParams }: {
         </div>
       )}
 
+      {brief && <EvidenceBrief brief={brief} />}
+
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-6 lg:col-span-3">
           <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
@@ -121,11 +130,15 @@ export default async function SchoolReport({ params, searchParams }: {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-            <h2 className="mb-4 text-lg font-semibold text-white">Salary records ({records.length})</h2>
-            <div className="space-y-2">
+          <details className="group rounded-2xl border border-white/10 bg-white/[0.03]">
+            <summary className="flex cursor-pointer list-none items-center justify-between p-6 text-lg font-semibold text-white">
+              <span>Salary evidence ({records.length})</span>
+              <span className="text-sm font-normal text-slate-500 group-open:hidden">Show records</span>
+              <span className="hidden text-sm font-normal text-slate-500 group-open:inline">Hide records</span>
+            </summary>
+            <div className="space-y-2 border-t border-white/[0.06] px-6 pb-6 pt-4">
               {records.slice(0, 12).map((r) => (
-                <div key={r.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5 text-sm">
+                <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5 text-sm">
                   <div>
                     <span className="text-slate-300">{r.role || "Teacher"}</span>
                     <span className="ml-2 text-xs text-slate-500">{r.year}</span>
@@ -139,7 +152,7 @@ export default async function SchoolReport({ params, searchParams }: {
                 </div>
               ))}
             </div>
-          </section>
+          </details>
 
           <OfferInput slug={school.slug} currentOffer={offerAnalysis?.offeredMonthlyUsd} />
 
@@ -196,10 +209,79 @@ export default async function SchoolReport({ params, searchParams }: {
 
           <SentimentPanel schoolId={school.id} schoolName={school.name} />
 
-          <WebsiteHealthPanel schoolName={school.name} city={school.city} country={school.country} />
+          <details className="group">
+            <summary className="cursor-pointer list-none rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm font-medium text-slate-300 transition hover:border-white/20 hover:text-white">
+              <span className="group-open:hidden">Open website and research checks</span>
+              <span className="hidden group-open:inline">Hide website and research checks</span>
+            </summary>
+            <div className="mt-3">
+              <WebsiteHealthPanel schoolName={school.name} city={school.city} country={school.country} />
+            </div>
+          </details>
         </div>
       </div>
     </main>
+  );
+}
+
+function EvidenceBrief({ brief }: { brief: SchoolBriefRow }) {
+  return (
+    <section className="mb-8 rounded-2xl border border-indigo-400/20 bg-indigo-500/[0.05] p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-indigo-300">
+            Evidence brief
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-white">What to investigate</h2>
+        </div>
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-slate-400">
+          AI-assisted · {brief.source_post_count} public posts
+        </span>
+      </div>
+      <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">{brief.summary}</p>
+      <details className="group mt-4 border-t border-white/[0.06] pt-4">
+        <summary className="cursor-pointer list-none text-sm font-medium text-indigo-200">
+          <span className="group-open:hidden">Show evidence-led prompts</span>
+          <span className="hidden group-open:inline">Hide evidence-led prompts</span>
+        </summary>
+        <div className="mt-4 grid gap-5 md:grid-cols-3">
+          <BriefList title="Positive signals" items={brief.strengths} tone="text-emerald-300" />
+          <BriefList title="Watch closely" items={brief.watchouts} tone="text-amber-300" />
+          <BriefList title="Ask the school" items={brief.questions} tone="text-indigo-300" />
+        </div>
+      </details>
+      <p className="mt-4 text-[11px] text-slate-500">
+        A low-cost agent summarizes patterns, not facts. Verify every claim directly.
+      </p>
+    </section>
+  );
+}
+
+function BriefList({
+  title,
+  items,
+  tone,
+}: {
+  title: string;
+  items: string[];
+  tone: string;
+}) {
+  return (
+    <div>
+      <p className={`text-xs font-semibold uppercase tracking-wider ${tone}`}>{title}</p>
+      {items.length > 0 ? (
+        <ul className="mt-2 space-y-2 text-sm leading-relaxed text-slate-400">
+          {items.map((item) => (
+            <li key={item} className="flex gap-2">
+              <span className="text-slate-600">•</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-sm text-slate-500">Not enough repeated evidence yet.</p>
+      )}
+    </div>
   );
 }
 

@@ -1,6 +1,11 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { searchSchools } from "@/lib/db/repo";
 import { netValues, statsFor } from "@/lib/analysis/finance";
+import {
+  recordDiscoveryRequest,
+  recordSchoolInterest,
+} from "@/lib/db/interest";
+import { enqueue } from "@/lib/db/queue";
 
 export const runtime = "nodejs";
 
@@ -21,5 +26,33 @@ export async function GET(request: Request) {
       medianNetUsd: median,
     };
   });
+
+  if (q.trim().length >= 2) {
+    after(async () => {
+      const uuidResults = results.filter((school) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          school.id,
+        ),
+      );
+      if (uuidResults.length === 0) {
+        await recordDiscoveryRequest(q);
+        return;
+      }
+      await recordSchoolInterest(
+        uuidResults.slice(0, 5).map((school) => school.id),
+        "search",
+      );
+      const today = new Date().toISOString().slice(0, 10);
+      await Promise.all(
+        uuidResults.slice(0, 3).map((school) =>
+          enqueue(
+            "reddit_fetch",
+            { schoolName: school.name, schoolId: school.id },
+            { dedupeKey: `search-discovery-${school.id}-${today}` },
+          ),
+        ),
+      );
+    });
+  }
   return NextResponse.json({ count: results.length, schools: results });
 }

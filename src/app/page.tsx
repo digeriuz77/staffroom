@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PasteLink } from "@/components/PasteLink";
-import { CheckIcon, SparkIcon } from "@/components/icons";
+import { CheckIcon } from "@/components/icons";
 import { getSchools, getColItems } from "@/lib/db/repo";
 
 export const dynamic = "force-dynamic";
@@ -61,63 +61,44 @@ export default async function Home({
         </div>
       </section>
 
-      <section className="mx-auto max-w-5xl px-4 pb-24">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <FeatureCard
-            title="Salary verdict"
-            desc="Compare the offer against real percentile data for the school, country and region."
-          />
-          <FeatureCard
-            title="Purchasing power"
-            desc="See real take-home, monthly living costs, savings and what a beer or gym costs locally."
-          />
-          <FeatureCard
-            title="Social sentiment"
-            desc="Stored Reddit corpus with theme clusters and turnover signals, not just live scraping."
-          />
-          <FeatureCard
-            title="Jobs board"
-            desc="A free, community-run board where signed-in members post real teaching vacancies."
-          />
-        </div>
-
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href="/board"
-            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:border-indigo-400/30"
-          >
-            Browse the jobs board
-          </Link>
-          <Link
-            href="/compare"
-            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:border-indigo-400/30"
-          >
-            Compare schools
-          </Link>
-          <Link
-            href="/purchasing-power"
-            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:border-indigo-400/30"
-          >
-            <SparkIcon className="h-4 w-4 text-indigo-400" />
-            Purchasing-power tool
-          </Link>
-          <Link
-            href="/submit"
-            className="inline-flex items-center gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/10 px-5 py-2.5 text-sm font-medium text-indigo-200 transition hover:bg-indigo-500/20"
-          >
-            Contribute your data
-          </Link>
+      <section className="mx-auto max-w-4xl px-4 pb-24">
+        <div className="glass rounded-2xl p-5 sm:p-6">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-white">Explore Staffroom Intel</h2>
+            <p className="mt-1 text-sm text-slate-400">Start with the route that matches your next decision.</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <SupportingLink href="/compare" title="Compare schools" detail="Packages side by side" />
+            <SupportingLink href="/board" title="Browse jobs" detail="Community vacancies" />
+            <SupportingLink href="/submit" title="Contribute data" detail="Improve the evidence" />
+          </div>
         </div>
       </section>
     </main>
   );
 }
 
-function FeatureCard({ title, desc }: { title: string; desc: string }) {
+function SupportingLink({
+  href,
+  title,
+  detail,
+}: {
+  href: string;
+  title: string;
+  detail: string;
+}) {
   return (
-    <div className="glass rounded-2xl p-6 transition hover:-translate-y-0.5 hover:bg-white/[0.05]">
-      <h3 className="text-base font-semibold text-white">{title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-slate-400">{desc}</p>
-    </div>
+    <Link
+      href={href}
+      className="group flex min-h-16 items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left transition hover:border-indigo-400/30 hover:bg-white/[0.06]"
+    >
+      <span>
+        <span className="block text-sm font-medium text-white">{title}</span>
+        <span className="mt-0.5 block text-xs text-slate-500">{detail}</span>
+      </span>
+      <span className="text-slate-600 transition group-hover:translate-x-0.5 group-hover:text-indigo-300" aria-hidden="true">
+        →
+      </span>
+    </Link>
   );
 }
