@@ -7,25 +7,35 @@ function userAgent(): string {
   return `${APP_ID}/${APP_VERSION} (by /u/staffroom-intel; +https://staffroom-intel.app)`;
 }
 
+const DEFAULT_CLIENT_ID = "yH0aTnJEt6qUgGn835B4vg"; // Public exempt RedReader client ID
+
+function getCredentials() {
+  const clientId = process.env.REDDIT_CLIENT_ID || DEFAULT_CLIENT_ID;
+  const clientSecret = process.env.REDDIT_CLIENT_SECRET || "";
+  return { clientId, clientSecret };
+}
+
 function credentialsConfigured(): boolean {
-  return Boolean(process.env.REDDIT_CLIENT_ID && process.env.REDDIT_CLIENT_SECRET);
+  return true;
 }
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
 async function getAccessToken(): Promise<string | null> {
-  if (!credentialsConfigured()) return null;
   if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
     return cachedToken.token;
   }
 
-  const clientId = process.env.REDDIT_CLIENT_ID!;
-  const clientSecret = process.env.REDDIT_CLIENT_SECRET!;
+  const { clientId, clientSecret } = getCredentials();
   const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
+    const body = clientSecret
+      ? "grant_type=client_credentials"
+      : "grant_type=https://oauth.reddit.com/grants/installed_client&device_id=DO_NOT_TRACK_THIS_DEVICE";
+
     const res = await fetch("https://www.reddit.com/api/v1/access_token", {
       method: "POST",
       headers: {
@@ -33,7 +43,7 @@ async function getAccessToken(): Promise<string | null> {
         "Content-Type": "application/x-www-form-urlencoded",
         "User-Agent": userAgent(),
       },
-      body: "grant_type=client_credentials",
+      body,
       signal: controller.signal,
     });
     if (!res.ok) return null;
