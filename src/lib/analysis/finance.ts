@@ -1,6 +1,4 @@
-import type { SalaryRecord, School } from "@/lib/types";
-import { SALARIES } from "@/lib/data/schools";
-import { regionOfCountry } from "@/lib/data/geo";
+import type { SalaryRecord } from "@/lib/types";
 
 export interface SalaryStats {
   count: number;
@@ -52,14 +50,6 @@ export function percentileOf(value: number, values: number[]): number {
     else if (v === value) equal++;
   }
   return ((below + 0.5 * equal) / sorted.length) * 100;
-}
-
-export function recordsForRegion(region: School["region"]): SalaryRecord[] {
-  return SALARIES.filter((r) => regionOfCountry(r.country) === region);
-}
-
-export function recordsForCountry(country: string): SalaryRecord[] {
-  return SALARIES.filter((r) => r.country.toLowerCase() === country.trim().toLowerCase());
 }
 
 export interface HistogramBucket {

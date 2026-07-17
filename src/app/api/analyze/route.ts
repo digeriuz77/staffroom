@@ -1,33 +1,38 @@
 import { NextResponse } from "next/server";
+import { safeFetch } from "@/lib/net/safeFetch";
 import { parseJobLink } from "@/lib/parser/jobLink";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  let body: { url?: string };
+  let body: { url?: string; text?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const url = (body.url ?? "").trim();
-  if (!url) return NextResponse.json({ error: "A job link URL is required" }, { status: 400 });
 
-  let html = "";
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { "user-agent": "StaffroomIntel/1.0 (+school intelligence tool)" },
-      redirect: "follow",
-    });
-    clearTimeout(timeout);
-    if (res.ok) html = await res.text();
-  } catch {
-    html = "";
+  const url = (body.url ?? "").trim();
+  const pastedText = (body.text ?? "").trim();
+
+  if (!url && !pastedText) {
+    return NextResponse.json({ error: "Either a URL or pasted job description text is required" }, { status: 400 });
   }
 
-  const parsed = parseJobLink(url, { html });
+  // Fetch HTML if a URL is provided (may fail due to scraping blocks — that's OK).
+  let html = "";
+  if (url) {
+    const result = await safeFetch(url, { timeoutMs: 6000 });
+    if (result.ok) html = result.text;
+  }
+
+  // Parse from whatever sources we have: fetched HTML + pasted text.
+  const parsed = parseJobLink(url, { html, text: pastedText });
+
+  // If we got nothing useful and there's pasted text, surface it as a signal.
+  if (!parsed.matchedSchoolId && !parsed.offeredMonthlyUsd && pastedText) {
+    parsed.warning = "We extracted what we could from the text. Search for the school and enter the salary manually below.";
+  }
+
   return NextResponse.json({ parsed });
 }

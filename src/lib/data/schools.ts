@@ -2,7 +2,7 @@ import type { CurriculumTag, HousingType, Region, SalaryRecord, School } from "@
 import { codeOfCountry, regionOfCountry } from "@/lib/data/geo";
 import { SALARY_TSV } from "@/lib/data/salaryRaw";
 
-function slugify(s: string): string {
+export function slugify(s: string): string {
   return s
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -121,10 +121,6 @@ export function deriveSchools(): DerivedSchool[] {
   const all = Array.from(map.values()).sort((a, b) => b.records.length - a.records.length || a.school.name.localeCompare(b.school.name));
   for (const e of all) schoolCache.set(e.school.id, e);
   return all;
-}
-
-export function getDerivedSchool(id: string): DerivedSchool | undefined {
-  return deriveSchools().find((s) => s.school.id === id);
 }
 
 export function getDerivedSchoolBySlug(slug: string): DerivedSchool | undefined {

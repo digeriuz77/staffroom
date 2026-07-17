@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { deriveSchools } from "@/lib/data/schools";
+import { getSchools } from "@/lib/db/repo";
 import { REGION_ORDER } from "@/lib/types";
 import { formatUsd } from "@/lib/analysis/finance";
 import { netValues, statsFor } from "@/lib/analysis/finance";
@@ -10,8 +10,10 @@ export const metadata: Metadata = {
   description: "Browse real international school salary data by region and country.",
 };
 
-export default function SchoolsPage() {
-  const all = deriveSchools();
+export const dynamic = "force-dynamic";
+
+export default async function SchoolsPage() {
+  const all = await getSchools();
   const byRegion = new Map<string, typeof all>();
   for (const s of all) {
     const list = byRegion.get(s.school.region) ?? [];

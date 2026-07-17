@@ -7,9 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "db:seed": "bun run scripts/seed.ts",
+    "db:parity": "bun run scripts/parity-check.ts",
+    "worker": "bun run worker/index.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.2",
     "next": "^16.1.3",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"

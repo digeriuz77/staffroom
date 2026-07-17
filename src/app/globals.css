@@ -2,59 +2,141 @@
 
 :root {
   color-scheme: dark;
+  --bg: #07090f;
+  --bg-elev: #0c0f17;
+  --bg-card: rgba(255, 255, 255, 0.03);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.16);
+  --text: #e7eaf0;
+  --text-muted: #8b94a8;
+  --text-dim: #5b6478;
+  --indigo: #818cf8;
+  --fuchsia: #e879f9;
+  --emerald: #34d399;
+  --amber: #fbbf24;
+  --rose: #fb7185;
 }
 
 html,
 body {
-  background-color: #07090f;
-  color: #e7eaf0;
+  background-color: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ambient background: subtle aurora + grid for depth */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(99, 102, 241, 0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 0%, rgba(232, 121, 249, 0.06) 0%, transparent 50%);
+  pointer-events: none;
 }
 
 .bg-grid {
   background-image:
-    linear-gradient(to right, rgba(148, 163, 184, 0.06) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
-  background-size: 44px 44px;
+    linear-gradient(to right, rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 70% 80% at 50% 0%, black 40%, transparent 80%);
 }
 
 .glow {
-  background: radial-gradient(60% 60% at 50% 0%, rgba(99, 102, 241, 0.22) 0%, rgba(99, 102, 241, 0) 70%);
+  background: radial-gradient(50% 50% at 50% 0%, rgba(99, 102, 241, 0.18) 0%, rgba(232, 121, 249, 0.05) 50%, transparent 70%);
 }
 
+/* Glassmorphism card system */
+.glass {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+.glass:hover {
+  border-color: var(--border-hover);
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+}
+
+/* Gradient text utility */
+.text-gradient {
+  background: linear-gradient(135deg, #818cf8 0%, #e879f9 50%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Animations */
 @keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-rise {
+  animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.animate-rise {
-  animation: rise 0.5s ease both;
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade {
+  animation: fade-in 0.3s ease both;
 }
 
 @keyframes bar-rise {
-  from {
-    height: 0;
-  }
+  from { height: 0; opacity: 0.4; }
 }
-
 .animate-bar {
   animation: bar-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-::selection {
-  background: rgba(129, 140, 248, 0.35);
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.02) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.02) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }
 
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(129, 140, 248, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(129, 140, 248, 0); }
 }
+.pulse-glow {
+  animation: pulse-glow 2s infinite;
+}
+
+::selection {
+  background: rgba(129, 140, 248, 0.35);
+  color: #fff;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.25);
+  background: rgba(148, 163, 184, 0.2);
   border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.35);
+  background-clip: padding-box;
+}
+
+/* Focus rings */
+:focus-visible {
+  outline: 2px solid rgba(129, 140, 248, 0.5);
+  outline-offset: 2px;
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { SentimentPost } from "@/lib/types";
 import { SourceIcon } from "@/components/icons";
+import { labelFromScore } from "@/lib/analysis/sentiment";
 
 interface Props {
   schoolId: string;
@@ -109,8 +110,7 @@ function StatusBadge({ status, reason }: { status?: string; reason?: string }) {
 
 function SentimentMeter({ avg }: { avg: number }) {
   const pct = ((avg + 0.7) / 1.4) * 100;
-  const label =
-    avg >= 0.35 ? "Excellent" : avg >= 0.12 ? "Positive" : avg >= -0.12 ? "Mixed" : avg >= -0.3 ? "Concerns" : "Poor";
+  const label = labelFromScore(avg);
   const color =
     avg >= 0.12 ? "from-emerald-500 to-emerald-400" : avg >= -0.12 ? "from-amber-500 to-amber-400" : "from-rose-500 to-rose-400";
   return (

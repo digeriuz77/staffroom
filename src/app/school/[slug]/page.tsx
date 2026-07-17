@@ -1,41 +1,45 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getDerivedSchool } from "@/lib/data/schools";
-import { buildSalaryReport, formatUsd } from "@/lib/analysis/salary";
+import { buildSalaryReportAsync, formatUsd } from "@/lib/analysis/salary";
 import { Histogram, StatBar } from "@/components/charts";
 import { SentimentPanel } from "@/components/SentimentPanel";
+import { TanePanel } from "@/components/TanePanel";
+import { WebsiteHealthPanel } from "@/components/WebsiteHealthPanel";
+import { RolePreviewPanel } from "@/components/RolePreviewPanel";
+import { ProvenanceBadge, DataDisclaimer } from "@/components/ProvenanceBadge";
+import { OfferInput } from "@/components/OfferInput";
 import { ArrowIcon } from "@/components/icons";
 import { verdictTone, sentimentTone, TONE_CLASSES, pct } from "@/lib/tone";
+import { getTaxRateForCountry } from "@/lib/db/repo";
 import type { Metadata } from "next";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const derived = getDerivedSchool(slug);
-  if (!derived) return { title: "School not found" };
+  const meta = await buildSalaryReportAsync(slug);
+  if (!meta) return { title: "School not found" };
   return {
-    title: `${derived.school.name} — salary, purchasing power & sentiment`,
-    description: `Real salary data, cost of living and teacher reviews for ${derived.school.name} in ${derived.school.city}, ${derived.school.country}.`,
+    title: `${meta.school.name} — salary, purchasing power & sentiment`,
+    description: `Real salary data, cost of living and teacher reviews for ${meta.school.name} in ${meta.school.city}, ${meta.school.country}.`,
   };
 }
 
 export default async function SchoolReport({ params, searchParams }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ offer?: string }>;
+  searchParams: Promise<{ offer?: string; role?: string }>;
 }) {
   const { slug } = await params;
-  const { offer } = await searchParams;
+  const { offer, role } = await searchParams;
   const offerMonthly = offer ? Number(offer) : undefined;
-  const derived = getDerivedSchool(slug);
-  if (!derived) notFound();
 
   const job = offerMonthly && Number.isFinite(offerMonthly)
     ? { ok: true, source: "unknown" as const, rawUrl: "", offeredMonthlyUsd: offerMonthly }
     : null;
 
-  const report = buildSalaryReport(slug, job);
+  const report = await buildSalaryReportAsync(slug, job);
   if (!report) notFound();
 
   const { school, schoolStats, countryStats, regionStats, histogram, col, offer: offerAnalysis, records } = report;
+  const taxRate = await getTaxRateForCountry(school.country);
   const vTone = offerAnalysis ? verdictTone(offerAnalysis.verdict) : null;
   const vClasses = vTone ? TONE_CLASSES[vTone] : null;
   const lo = Math.min(countryStats.min, regionStats.min);
@@ -60,6 +64,14 @@ export default async function SchoolReport({ params, searchParams }: {
         <p className="mt-2 text-sm text-slate-400">
           {records.length} real salary record{records.length !== 1 ? "s" : ""} · data from {Math.min(...school.years)}–{Math.max(...school.years)}
         </p>
+        <div className="mt-3 flex gap-2">
+          <Link
+            href={`/compare?schools=${school.slug}`}
+            className="inline-flex items-center gap-1 rounded-lg border border-indigo-400/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-200 transition hover:bg-indigo-500/20"
+          >
+            ⚖ Add to comparison
+          </Link>
+        </div>
       </header>
 
       {offerAnalysis && vClasses && (
@@ -82,6 +94,12 @@ export default async function SchoolReport({ params, searchParams }: {
             <MiniStat label="monthly savings" value={formatUsd(offerAnalysis.monthlySavingsUsd)} sub={`${pct(offerAnalysis.savingsRate)} of net`} />
             <MiniStat label="buying power" value={formatUsd(offerAnalysis.buyingPowerUsd)} sub="COL-adjusted" />
           </div>
+
+          {(role || offerAnalysis) && (
+            <div className="mt-4">
+              <RolePreviewPanel roleText={role ?? (report.records[0]?.role ?? "")} />
+            </div>
+          )}
         </div>
       )}
 
@@ -115,6 +133,7 @@ export default async function SchoolReport({ params, searchParams }: {
                   <div>
                     <span className="text-slate-300">{r.role || "Teacher"}</span>
                     <span className="ml-2 text-xs text-slate-500">{r.year}</span>
+                    <ProvenanceBadge tier="seed" />
                   </div>
                   <div className="flex items-center gap-3">
                     {r.housing !== "None" && <span className="text-xs text-indigo-300">{r.housing}</span>}
@@ -125,9 +144,37 @@ export default async function SchoolReport({ params, searchParams }: {
               ))}
             </div>
           </section>
+
+          <OfferInput slug={school.slug} currentOffer={offerAnalysis?.offeredMonthlyUsd} />
+
+          <TanePanel slug={school.slug} offerMonthlyUsd={offerAnalysis?.offeredMonthlyUsd} />
+
+          <DataDisclaimer />
         </div>
 
         <div className="space-y-6 lg:col-span-2">
+          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+            <h2 className="text-lg font-semibold text-white">Tax regime</h2>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <span className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-slate-200">
+                {taxRate.taxRegime}
+              </span>
+              <span className="text-2xl font-bold text-emerald-300">
+                {Math.round(taxRate.takeHomePct * 100)}% take-home
+              </span>
+              <span className="text-sm text-slate-500">
+                ~{Math.round(taxRate.effectiveRate * 100)}% effective tax
+                {taxRate.socialInsuranceRate != null && ` + ${Math.round(taxRate.socialInsuranceRate * 100)}% social`}
+              </span>
+            </div>
+            {taxRate.specialNotes && (
+              <p className="mt-3 text-sm leading-relaxed text-slate-400">{taxRate.specialNotes}</p>
+            )}
+            <p className="mt-2 text-xs text-slate-600">
+              Currency: {taxRate.currency} · Source: {taxRate.country === "Unknown" ? "estimated default" : "researched 2026"}
+            </p>
+          </section>
+
           {col && (
             <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
               <h2 className="text-lg font-semibold text-white">Cost of living &amp; power</h2>
@@ -152,6 +199,8 @@ export default async function SchoolReport({ params, searchParams }: {
           )}
 
           <SentimentPanel schoolId={school.id} schoolName={school.name} />
+
+          <WebsiteHealthPanel schoolName={school.name} city={school.city} country={school.country} />
         </div>
       </div>
     </main>

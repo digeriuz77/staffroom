@@ -24,7 +24,7 @@ export function Histogram({ data, offerValue }: { data: HistogramBucket[]; offer
                 {d.count}
               </span>
               <div
-                className={`w-full animate-bar rounded-t-md ${isOffer ? "bg-gradient-to-t from-fuchsia-500 to-indigo-400" : "bg-gradient-to-t from-indigo-500/40 to-indigo-400/70"}`}
+                className={`w-full animate-bar rounded-t-md transition-all ${isOffer ? "bg-gradient-to-t from-fuchsia-600 to-indigo-400 shadow-lg shadow-fuchsia-500/20" : "bg-gradient-to-t from-indigo-600/30 to-indigo-400/50 group-hover:from-indigo-600/50 group-hover:to-indigo-400/70"}`}
                 style={{ height: `${Math.max(h, 4)}%` }}
               />
             </div>
