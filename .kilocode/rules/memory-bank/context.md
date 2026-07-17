@@ -135,10 +135,25 @@ The Reddit API workaround (committed prior) seeds 30 posts via `0009_reddit_post
 ### Validation
 - typecheck: exit 0
 - lint: exit 0
-- tests: 72 pass, 0 fail (was 65)
+- tests: 75 pass, 0 fail (was 65; +10 across clustering + live themes)
+
+### Live sentiment path (the real fix this session)
+The seed/lexicon work above was the bootstrap; the second half of the session made the read path genuinely LIVE so browsing grows the corpus and teachers see fresh info without an admin in the loop:
+
+- **`src/app/api/sentiment/route.ts`** rewritten:
+  - **Freshness-aware re-fetch**: a school is re-fetched when its corpus is older than `SENTIMENT_FRESHNESS_HOURS` (default 6h) OR has < 3 posts — not only when < 3. Popular schools stay current as new Reddit threads appear.
+  - **Write-through persistence**: live-fetched posts are upserted into `reddit_posts` immediately (via `persistPostsForSchool`), so every browse grows the corpus in real time — no waiting on the worker. Reddit posts are NEVER admin-reviewed (only salary/COL *submissions* are moderated, since those are verifiable claims tied to reputation/bounties).
+  - **On-demand background jobs**: when stale, enqueues a targeted `reddit_fetch` (deepening sweep) AND a `cluster` job for that school (deduped per school per day), so the worker keeps the school's stored clusters/embeddings current.
+  - **Inline live themes**: when `theme_clusters` is empty/stale, themes are computed straight from the posts via `aggregateThemesFromPosts` so "what teachers talk about" renders immediately — no worker wait.
+  - `loadStored()` now returns `lastFetchedAt` (most recent `fetched_at`) to drive freshness.
+- **`src/lib/ai/redditIngest.ts`**: exported `persistPostsForSchool()` (write-through upsert, idempotent on id).
+- **`src/lib/ai/clustering.ts`**: added pure `aggregateThemesFromPosts()` for inline theme computation; `cluster` job payload now accepts `{ schoolId }` for per-school on-demand re-clustering (worker/cluster.ts already passed it through).
 
 ### Embeddings contract (now documented)
-Two tiers: lexicon (free, instant, from seed) → semantic (opt-in upgrade via `EMBEDDINGS_API_KEY` on the worker). pgvector schema (`vector(1536)` + HNSW) and `set_post_embedding` RPC were already in place from `0001`/`0003`; nothing schema-side changed.
+Two tiers: lexicon (free, instant, from seed/live posts) → semantic (opt-in upgrade via `EMBEDDINGS_API_KEY` on the worker). pgvector schema (`vector(1536)` + HNSW) and `set_post_embedding` RPC were already in place from `0001`/`0003`; nothing schema-side changed.
+
+### Live data flow (end to end)
+Teacher opens school report → `/api/sentiment` → serves cached `reddit_posts`/`theme_clusters`/turnover from Supabase → if stale, live-fetches Reddit (RedReader installed_client fallback, no dev key), writes new posts back to DB immediately, computes themes inline, and enqueues background `reddit_fetch` + `cluster` jobs → worker deepens corpus + (if embeddings key set) embeds + semantic-clusters → next visitor hits a richer cached corpus. Compound, self-updating, no admin gate on Reddit content.
 
 ## Pending / Next
 - Deploy: run migrations 0001–0010 in order, `bun db:seed` (REQUIRED before 0009/0010 resolve school slugs), `bun db:parity`. Optionally `bun embed:posts` once `EMBEDDINGS_API_KEY` is set.

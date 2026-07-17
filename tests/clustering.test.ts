@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { bucketByThemes, canonicalTheme } from "@/lib/ai/clustering";
+import { aggregateThemesFromPosts, bucketByThemes, canonicalTheme } from "@/lib/ai/clustering";
 import type { ClusterPost } from "@/lib/ai/clustering";
 
 // Clustering post constructor with sensible defaults.
@@ -36,6 +36,37 @@ describe("canonicalTheme", () => {
     ]) {
       expect(canonicalTheme(label)).toBe(label);
     }
+  });
+});
+
+describe("aggregateThemesFromPosts (live inline themes)", () => {
+  it("groups lexicon tags into canonical themes with averaged sentiment", () => {
+    const themes = aggregateThemesFromPosts([
+      { themes: ["Salary", "Housing"], sentiment: 0.5 },
+      { themes: ["Salary"], sentiment: -0.3 },
+      { themes: ["Leadership"], sentiment: 0.1 },
+    ]);
+    const byLabel = new Map(themes.map((t) => [t.label, t]));
+    expect(byLabel.get("Pay")?.count).toBe(2);
+    expect(byLabel.get("Pay")?.sentiment).toBe(0.1); // (0.5 + -0.3) / 2
+    expect(byLabel.get("Management")?.count).toBe(1);
+    expect(byLabel.get("Housing")?.count).toBe(1);
+  });
+
+  it("is sorted by descending post count", () => {
+    const themes = aggregateThemesFromPosts([
+      { themes: ["Housing"], sentiment: 0 },
+      { themes: ["Salary", "Workload"], sentiment: 0 },
+      { themes: ["Salary"], sentiment: 0 },
+    ]);
+    expect(themes[0].label).toBe("Pay");
+    expect(themes[0].count).toBe(2);
+  });
+
+  it("returns nothing for posts without themes", () => {
+    expect(aggregateThemesFromPosts([{ themes: null, sentiment: 0 }])).toEqual([]);
+    expect(aggregateThemesFromPosts([{ themes: [], sentiment: 0 }])).toEqual([]);
+    expect(aggregateThemesFromPosts([])).toEqual([]);
   });
 });
 

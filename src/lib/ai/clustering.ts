@@ -127,6 +127,42 @@ export function bucketByThemes(
   return buckets;
 }
 
+export interface ThemeAggregate {
+  label: string;
+  count: number;
+  sentiment: number;
+}
+
+/**
+ * Compute a live theme breakdown straight from posts' lexicon `themes` tags —
+ * pure, no DB, no provider. Used by the sentiment read path to surface "what
+ * teachers talk about" IMMEDIATELY after fresh posts are ingested, without
+ * waiting for the worker's clustering job to cache rows into theme_clusters.
+ * The persisted theme_clusters table (worker, semantic) takes precedence when
+ * present; this fills the gap in between.
+ */
+export function aggregateThemesFromPosts(
+  posts: { themes: string[] | null; sentiment: number }[],
+): ThemeAggregate[] {
+  const buckets = new Map<string, { count: number; sentSum: number }>();
+  for (const p of posts) {
+    for (const raw of p.themes ?? []) {
+      const label = canonicalTheme(raw);
+      const b = buckets.get(label) ?? { count: 0, sentSum: 0 };
+      b.count++;
+      b.sentSum += p.sentiment;
+      buckets.set(label, b);
+    }
+  }
+  return Array.from(buckets.entries())
+    .map(([label, b]) => ({
+      label,
+      count: b.count,
+      sentiment: b.count ? Math.round((b.sentSum / b.count) * 100) / 100 : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
+}
+
 interface ClusterPayload {
   schoolId?: string;
 }
