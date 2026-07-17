@@ -1,5 +1,17 @@
-// Clustering: assign embedded Reddit posts to themes via nearest-centroid to
-// keyword-seeded centroids, then write theme_clusters per school + time window.
+// Clustering: assign Reddit posts to themes, then write theme_clusters per
+// school + time window.
+//
+// Two assignment modes, same output table:
+//  - Semantic (preferred): nearest-centroid to keyword-seeded centroids over
+//    pgvector embeddings. Requires EMBEDDINGS_API_KEY on the worker. Catches
+//    topics the lexicon misses.
+//  - Lexicon fallback: bucket posts by their already-computed `themes` text
+//    array (produced by detectThemes() at ingest). Zero external dependencies —
+//    so theme_clusters populate from the seeded corpus the moment a cluster job
+//    runs, even without a worker/API key.
+//
+// Posts WITH a vector use the semantic assignment; posts WITHOUT a vector fall
+// back to the lexicon, so a partially-embedded corpus still fully utilized.
 import { embedTexts, hasEmbeddingsProvider, parseVector } from "@/lib/ai/embeddings";
 import { SENTIMENT_THEMES } from "@/lib/config/jobs";
 import { supabaseServer } from "@/lib/db/supabaseClients";
@@ -14,6 +26,26 @@ const THEME_SEED: Record<string, string[]> = {
   Culture: ["culture environment toxic supportive community atmosphere"],
   Other: ["general school experience teachers students"],
 };
+
+/**
+ * Map the lexicon theme labels (from detectThemes in reddit/client.ts) onto the
+ * canonical SENTIMENT_THEMES vocabulary so lexicon + semantic modes produce
+ * consistent buckets. Only the two labels that differ are remapped; everything
+ * else (Students, Parents, Facilities, ...) is passed through unchanged so the
+ * lexicon mode can surface richer topics than the 7-way semantic split.
+ *
+ * Kept in sync with the CASE expression in 0010_theme_clusters_seed.sql.
+ */
+export function canonicalTheme(label: string): string {
+  switch (label) {
+    case "Salary":
+      return "Pay";
+    case "Leadership":
+      return "Management";
+    default:
+      return label;
+  }
+}
 
 let centroidCache: { label: string; vec: number[] }[] | null = null;
 
@@ -47,6 +79,90 @@ function nearestTheme(vec: number[] | null, centroids: { label: string; vec: num
   return bestSim > 0.15 ? best : "Other";
 }
 
+interface ClusterPost {
+  id: string;
+  embedding: number[] | string | null;
+  sentiment_score: number | null;
+  themes: string[] | null;
+  title: string | null;
+  body: string | null;
+}
+export type { ClusterPost };
+
+export interface ThemeBucket {
+  count: number;
+  sentSum: number;
+  posts: ClusterPost[];
+}
+
+/**
+ * Assign posts to theme buckets. Pure + side-effect free so it can be unit
+ * tested without Supabase. Each post contributes to one bucket in semantic
+ * mode (nearest-centroid) or to every bucket named in its lexicon `themes` in
+ * lexicon mode (or when it has no vector). Posts with no tags and no vector are
+ * dropped — they carry no usable signal.
+ */
+export function bucketByThemes(
+  posts: ClusterPost[],
+  centroids: { label: string; vec: number[] }[],
+  semantic: boolean,
+): Map<string, ThemeBucket> {
+  const buckets = new Map<string, ThemeBucket>();
+  for (const p of posts) {
+    const vec = parseVector(p.embedding);
+    const tags =
+      semantic && vec
+        ? [nearestTheme(vec, centroids)]
+        : (p.themes ?? []).map(canonicalTheme);
+    if (tags.length === 0) continue;
+    for (const theme of tags) {
+      if (!theme) continue;
+      const b = buckets.get(theme) ?? { count: 0, sentSum: 0, posts: [] };
+      b.count++;
+      b.sentSum += p.sentiment_score ?? 0;
+      b.posts.push(p);
+      buckets.set(theme, b);
+    }
+  }
+  return buckets;
+}
+
+export interface ThemeAggregate {
+  label: string;
+  count: number;
+  sentiment: number;
+}
+
+/**
+ * Compute a live theme breakdown straight from posts' lexicon `themes` tags —
+ * pure, no DB, no provider. Used by the sentiment read path to surface "what
+ * teachers talk about" IMMEDIATELY after fresh posts are ingested, without
+ * waiting for the worker's clustering job to cache rows into theme_clusters.
+ * The persisted theme_clusters table (worker, semantic) takes precedence when
+ * present; this fills the gap in between.
+ */
+export function aggregateThemesFromPosts(
+  posts: { themes: string[] | null; sentiment: number }[],
+): ThemeAggregate[] {
+  const buckets = new Map<string, { count: number; sentSum: number }>();
+  for (const p of posts) {
+    for (const raw of p.themes ?? []) {
+      const label = canonicalTheme(raw);
+      const b = buckets.get(label) ?? { count: 0, sentSum: 0 };
+      b.count++;
+      b.sentSum += p.sentiment;
+      buckets.set(label, b);
+    }
+  }
+  return Array.from(buckets.entries())
+    .map(([label, b]) => ({
+      label,
+      count: b.count,
+      sentiment: b.count ? Math.round((b.sentSum / b.count) * 100) / 100 : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
+}
+
 interface ClusterPayload {
   schoolId?: string;
 }
@@ -56,13 +172,9 @@ const WINDOW_DAYS = 90;
 export async function runClustering(payload: ClusterPayload): Promise<number> {
   const client = supabaseServer();
   if (!client) throw new Error("supabase not configured");
-  if (!hasEmbeddingsProvider()) {
-    // Centroids must come from the same model as stored post vectors.
-    console.warn("[cluster] no embeddings provider — skipping clustering run");
-    return 0;
-  }
 
-  const centroids = await themeCentroids();
+  const semantic = hasEmbeddingsProvider();
+  const centroids = semantic ? await themeCentroids() : [];
   const windowEnd = new Date();
   const windowStart = new Date(windowEnd.getTime() - WINDOW_DAYS * 86400 * 1000);
 
@@ -91,22 +203,30 @@ export async function runClustering(payload: ClusterPayload): Promise<number> {
     if (schoolId) query = query.eq("school_id", schoolId);
     else query = query.is("school_id", null);
     const { data } = await query;
-    const posts = (data as (Pick<RedditPostRow, "id" | "embedding" | "sentiment_score" | "themes" | "title" | "body">)[]) ?? [];
+    const posts = (data as ClusterPost[]) ?? [];
     if (posts.length === 0) continue;
 
-    // Bucket posts by assigned theme. Posts without a vector carry no
-    // semantic signal — skip rather than pollute "Other".
-    const buckets = new Map<string, { count: number; sentSum: number; posts: typeof posts }>();
-    for (const p of posts) {
-      const vec = parseVector(p.embedding);
-      if (!vec) continue;
-      const theme = nearestTheme(vec, centroids);
-      const b = buckets.get(theme) ?? { count: 0, sentSum: 0, posts: [] };
-      b.count++;
-      b.sentSum += p.sentiment_score ?? 0;
-      b.posts.push(p);
-      buckets.set(theme, b);
-    }
+    // Bucket posts by assigned theme (pure helper — see bucketByThemes).
+    const buckets = bucketByThemes(posts, centroids, semantic);
+
+    if (buckets.size === 0) continue;
+
+    // Idempotency: clear this school's prior clusters for the current window so
+    // re-runs replace rather than accumulate rows (the read path dedupes too,
+    // but this keeps the table from bloating).
+    const del = schoolId
+      ? client
+          .from("theme_clusters")
+          .delete()
+          .eq("school_id", schoolId)
+          .gte("window_start", windowStart.toISOString())
+      : client
+          .from("theme_clusters")
+          .delete()
+          .is("school_id", null)
+          .gte("window_start", windowStart.toISOString());
+    const { error: delErr } = await del;
+    if (delErr) console.warn(`[cluster] delete prior: ${delErr.message}`);
 
     for (const [theme, b] of buckets) {
       const avgSent = b.count ? b.sentSum / b.count : 0;
@@ -129,6 +249,8 @@ export async function runClustering(payload: ClusterPayload): Promise<number> {
       else clustersWritten++;
     }
   }
-  console.log(`[cluster] wrote ${clustersWritten} theme clusters across ${schoolIds.length} scopes`);
+  console.log(
+    `[cluster] wrote ${clustersWritten} theme clusters across ${schoolIds.length} scopes (${semantic ? "semantic" : "lexicon"})`,
+  );
   return clustersWritten;
 }
