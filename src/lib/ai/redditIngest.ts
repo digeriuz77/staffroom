@@ -150,3 +150,19 @@ async function storePosts(
   console.log(`[redditIngest] stored ${stored}/${posts.length} posts`);
   return stored;
 }
+
+/**
+ * Write-through cache: persist live-fetched posts to reddit_posts so the corpus
+ * grows in real time as teachers browse, without waiting for the background
+ * worker. Idempotent (upsert on id). Reddit posts are NEVER admin-reviewed —
+ * they auto-ingest; only salary/COL *submissions* go through moderation.
+ * Returns the number of rows upserted. No-ops (0) when Supabase is absent.
+ */
+export async function persistPostsForSchool(
+  posts: SentimentPost[],
+  schoolId: string | null,
+): Promise<number> {
+  const client = supabaseServer();
+  if (!client || posts.length === 0) return 0;
+  return storePosts(client, posts, "", schoolId);
+}
