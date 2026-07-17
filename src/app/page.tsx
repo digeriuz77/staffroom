@@ -5,7 +5,18 @@ import { getSchools, getColItems } from "@/lib/db/repo";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string; school?: string }>;
+}) {
+  const sp = await searchParams;
+  const initialMode = (sp.mode === "text" || sp.mode === "manual" ? sp.mode : "link") as
+    | "link"
+    | "text"
+    | "manual";
+  const initialSchoolQuery = sp.school ?? "";
+
   const [allSchools, colItems] = await Promise.all([getSchools(), getColItems()]);
   const salaries = allSchools.reduce((sum, s) => sum + s.records.length, 0);
   const schools = allSchools.length;
@@ -36,7 +47,7 @@ export default async function Home() {
           </p>
 
           <div className="mx-auto mt-10 max-w-2xl">
-            <PasteLink />
+            <PasteLink initialMode={initialMode} initialSchoolQuery={initialSchoolQuery} />
           </div>
 
           <div className="mx-auto mt-8 flex max-w-2xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-500">
@@ -51,28 +62,50 @@ export default async function Home() {
       </section>
 
       <section className="mx-auto max-w-5xl px-4 pb-24">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <FeatureCard
             title="Salary verdict"
-            desc="Compare the offer against real percentile data for the school, country and region — not just a median."
+            desc="Compare the offer against real percentile data for the school, country and region."
           />
           <FeatureCard
             title="Purchasing power"
-            desc="See real take-home, monthly living costs, savings potential and what a beer or gym membership actually costs."
+            desc="See real take-home, monthly living costs, savings and what a beer or gym costs locally."
           />
           <FeatureCard
             title="Social sentiment"
-            desc="Live Reddit posts and aggregated reputation signals, so you hear what teachers say before you sign."
+            desc="Stored Reddit corpus with theme clusters and turnover signals, not just live scraping."
+          />
+          <FeatureCard
+            title="Jobs board"
+            desc="A free, community-run board where signed-in members post real teaching vacancies."
           />
         </div>
 
-        <div className="mt-10 flex flex-col items-center gap-4 text-center">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/board"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:border-indigo-400/30"
+          >
+            Browse the jobs board
+          </Link>
+          <Link
+            href="/compare"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:border-indigo-400/30"
+          >
+            Compare schools
+          </Link>
           <Link
             href="/purchasing-power"
             className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:border-indigo-400/30"
           >
             <SparkIcon className="h-4 w-4 text-indigo-400" />
-            Try the purchasing-power tool
+            Purchasing-power tool
+          </Link>
+          <Link
+            href="/submit"
+            className="inline-flex items-center gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/10 px-5 py-2.5 text-sm font-medium text-indigo-200 transition hover:bg-indigo-500/20"
+          >
+            Contribute your data
           </Link>
         </div>
       </section>

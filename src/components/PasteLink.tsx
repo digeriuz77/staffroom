@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowIcon, LinkIcon } from "@/components/icons";
 
@@ -12,9 +12,21 @@ const EXAMPLES = [
   "https://www.searchassociates.com/jobs/shrewsbury-international-school-bangkok",
 ];
 
-export function PasteLink() {
+export function PasteLink({
+  initialMode = "link",
+  initialSchoolQuery = "",
+}: {
+  initialMode?: Mode;
+  initialSchoolQuery?: string;
+}) {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("link");
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const [manualPrefill, setManualPrefill] = useState(initialSchoolQuery);
+
+  function fallbackToManual(schoolName?: string) {
+    if (schoolName) setManualPrefill(schoolName);
+    setMode("manual");
+  }
 
   return (
     <div className="w-full">
@@ -25,9 +37,9 @@ export function PasteLink() {
         <ModeTab active={mode === "manual"} onClick={() => setMode("manual")} label="Enter manually" />
       </div>
 
-      {mode === "link" && <LinkMode router={router} />}
-      {mode === "text" && <TextMode router={router} />}
-      {mode === "manual" && <ManualMode router={router} />}
+      {mode === "link" && <LinkMode router={router} onFallback={fallbackToManual} />}
+      {mode === "text" && <TextMode router={router} onFallback={fallbackToManual} />}
+      {mode === "manual" && <ManualMode router={router} prefillQuery={manualPrefill} />}
     </div>
   );
 }
@@ -50,7 +62,13 @@ function ModeTab({ active, onClick, label }: { active: boolean; onClick: () => v
 // ---------------------------------------------------------------------------
 // Mode 1: Paste a URL (existing flow, improved)
 // ---------------------------------------------------------------------------
-function LinkMode({ router }: { router: ReturnType<typeof useRouter> }) {
+function LinkMode({
+  router,
+  onFallback,
+}: {
+  router: ReturnType<typeof useRouter>;
+  onFallback: (schoolName?: string) => void;
+}) {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,8 +90,8 @@ function LinkMode({ router }: { router: ReturnType<typeof useRouter> }) {
       if (data.parsed.matchedSchoolId) {
         routeToSchool(router, data.parsed.matchedSchoolId, data.parsed.offeredMonthlyUsd, data.parsed.role);
       } else {
-        // No match — go to text mode so they can paste the actual listing content.
-        router.push(`/manual?school=${encodeURIComponent(data.parsed.schoolName ?? "")}`);
+        // No match — drop into manual mode with whatever we detected prefilled.
+        onFallback(data.parsed.schoolName);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -131,7 +149,13 @@ function LinkMode({ router }: { router: ReturnType<typeof useRouter> }) {
 // ---------------------------------------------------------------------------
 // Mode 2: Paste job description text (when URL is blocked)
 // ---------------------------------------------------------------------------
-function TextMode({ router }: { router: ReturnType<typeof useRouter> }) {
+function TextMode({
+  router,
+  onFallback,
+}: {
+  router: ReturnType<typeof useRouter>;
+  onFallback: (schoolName?: string) => void;
+}) {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -190,7 +214,7 @@ function TextMode({ router }: { router: ReturnType<typeof useRouter> }) {
           {parsed.schoolName && <p className="mt-1 text-slate-400">Detected school: <strong>{parsed.schoolName}</strong></p>}
           {parsed.offeredMonthlyUsd && <p className="mt-1 text-slate-400">Detected salary: <strong>${parsed.offeredMonthlyUsd}/mo USD</strong></p>}
           <button
-            onClick={() => router.push("/manual")}
+            onClick={() => onFallback(parsed.schoolName)}
             className="mt-3 rounded-lg border border-indigo-400/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-200 transition hover:bg-indigo-500/20"
           >
             Enter manually →
@@ -204,24 +228,54 @@ function TextMode({ router }: { router: ReturnType<typeof useRouter> }) {
 // ---------------------------------------------------------------------------
 // Mode 3: Manual entry (school search + salary input → instant verdict)
 // ---------------------------------------------------------------------------
-function ManualMode({ router }: { router: ReturnType<typeof useRouter> }) {
-  const [query, setQuery] = useState("");
+const FX_FALLBACK: Record<string, number> = {
+  USD: 1, GBP: 1.34, AED: 0.272, EUR: 1.14, SGD: 0.78, CNY: 0.147, THB: 0.028,
+  QAR: 0.275, SAR: 0.267, INR: 0.012, AUD: 0.713, HKD: 0.128, JPY: 0.0062,
+};
+
+function ManualMode({ router, prefillQuery = "" }: { router: ReturnType<typeof useRouter>; prefillQuery?: string }) {
+  const [query, setQuery] = useState(prefillQuery);
   const [salary, setSalary] = useState("");
   const [period, setPeriod] = useState<"month" | "year">("month");
   const [currency, setCurrency] = useState("USD");
   const [results, setResults] = useState<{ slug: string; name: string; city: string; country: string; medianNetUsd?: number }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [fxRates, setFxRates] = useState<Record<string, number>>(FX_FALLBACK);
 
-  async function handleSearch() {
-    if (!query.trim()) return;
+  useEffect(() => {
+    let active = true;
+    fetch("/api/fx")
+      .then((r) => r.json())
+      .then((d) => {
+        if (active && d?.rates && typeof d.rates === "object") {
+          setFxRates((prev) => ({ ...prev, ...d.rates }));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const searchFor = useCallback(async (q: string) => {
+    if (!q.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/schools?q=${encodeURIComponent(query)}`);
+      const res = await fetch(`/api/schools?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       setResults(data.schools ?? []);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // A prefilled query (from a failed link parse) searches immediately.
+  useEffect(() => {
+    if (prefillQuery.trim()) void searchFor(prefillQuery);
+  }, [prefillQuery, searchFor]);
+
+  function handleSearch() {
+    void searchFor(query);
   }
 
   function handleSelect(slug: string) {
@@ -229,11 +283,7 @@ function ManualMode({ router }: { router: ReturnType<typeof useRouter> }) {
     let offerUsd: number | undefined;
     const num = Number(salary.replace(/[^0-9.]/g, ""));
     if (num > 0) {
-      const fx: Record<string, number> = {
-        USD: 1, GBP: 1.27, AED: 0.272, EUR: 1.08, SGD: 0.74, CNY: 0.138, THB: 0.028,
-        QAR: 0.275, SAR: 0.267, INR: 0.012, AUD: 0.713, HKD: 0.128, JPY: 0.0062,
-      };
-      const usd = num * (fx[currency] ?? 1);
+      const usd = num * (fxRates[currency] ?? 1);
       offerUsd = period === "year" ? Math.round(usd / 12) : Math.round(usd);
     }
     routeToSchool(router, slug, offerUsd);

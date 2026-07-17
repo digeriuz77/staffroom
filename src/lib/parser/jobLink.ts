@@ -1,5 +1,13 @@
 import type { JobSource, ParsedJob } from "@/lib/types";
 import { deriveSchools } from "@/lib/data/schools";
+import { FX_RATES_STATIC } from "@/lib/data/exchangeRates";
+
+export interface SchoolCandidate {
+  id: string;
+  slug: string;
+  name: string;
+  city: string;
+}
 
 const SOURCE_PATTERNS: { source: JobSource; test: RegExp }[] = [
   { source: "tes", test: /tes(\.com|\.jobs)/i },
@@ -49,14 +57,34 @@ function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-export function matchSchool(text: string): { id: string; name: string } | undefined {
+function defaultCandidates(): SchoolCandidate[] {
+  return deriveSchools().map(({ school }) => ({
+    id: school.id,
+    slug: school.slug,
+    name: school.name,
+    city: school.city,
+  }));
+}
+
+const GENERIC_TOKENS = ["school", "college", "international", "academy", "institute"];
+
+/**
+ * Fuzzy-match free text against a school directory. Callers in Supabase mode
+ * pass the live directory (so community-added schools are matchable); the TSV
+ * seed is the fallback.
+ */
+export function matchSchool(
+  text: string,
+  candidates?: SchoolCandidate[],
+): { id: string; slug: string; name: string } | undefined {
   const norm = normalize(text);
   if (!norm) return undefined;
-  let best: { id: string; name: string; score: number } | undefined;
-  for (const { school } of deriveSchools()) {
+  const pool = candidates && candidates.length > 0 ? candidates : defaultCandidates();
+  let best: { id: string; slug: string; name: string; score: number } | undefined;
+  for (const school of pool) {
     const schoolNorm = normalize(school.name);
     const cityNorm = normalize(school.city);
-    const tokens = schoolNorm.split(" ").filter((t) => t.length > 3 && !["school", "college", "international", "academy", "institute"].includes(t));
+    const tokens = schoolNorm.split(" ").filter((t) => t.length > 3 && !GENERIC_TOKENS.includes(t));
     let hits = 0;
     for (const t of tokens) {
       if (norm.includes(t)) hits++;
@@ -64,10 +92,10 @@ export function matchSchool(text: string): { id: string; name: string } | undefi
     let score = tokens.length ? hits / tokens.length : 0;
     if (cityNorm && norm.includes(cityNorm)) score += 0.2;
     if (score > 0.6 && (!best || score > best.score)) {
-      best = { id: school.id, name: school.name, score };
+      best = { id: school.id, slug: school.slug, name: school.name, score };
     }
   }
-  return best ? { id: best.id, name: best.name } : undefined;
+  return best ? { id: best.id, slug: best.slug, name: best.name } : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -192,38 +220,93 @@ function detectCurrency(text: string): string {
   return "USD";
 }
 
+const SALARY_CONTEXT_RE =
+  /salar(?:y|ies)|package|remuneration|compensation|pay\b|per month|per annum|monthly|annual|tax[- ]free|take[- ]home|p\.?a\.?|pcm|stipend/i;
+
+interface NumberHit {
+  amount: number;
+  index: number;
+  hasSymbol: boolean;
+  hasK: boolean;
+  rangeMax?: number;
+}
+
+function looksLikeYear(n: number, hasSymbol: boolean, hasK: boolean): boolean {
+  return !hasSymbol && !hasK && Number.isInteger(n) && n >= 1900 && n <= 2100;
+}
+
+function collectNumberHits(text: string): NumberHit[] {
+  const hits: NumberHit[] = [];
+  const re = /(£|€|¥|\$|₹|฿)?\s*(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(k)?(?:\s*(?:-|–|to)\s*(£|€|¥|\$|₹|฿)?\s*(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(k)?)?/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) && hits.length < 40) {
+    const hasSymbol = Boolean(m[1] ?? m[4]);
+    const hasK = /k/i.test(m[3] ?? "");
+    let amount = Number(m[2].replace(/,/g, ""));
+    if (!Number.isFinite(amount)) continue;
+    if (hasK) amount *= 1000;
+    let rangeMax: number | undefined;
+    if (m[5]) {
+      let hi = Number(m[5].replace(/,/g, ""));
+      if (/k/i.test(m[6] ?? "")) hi *= 1000;
+      if (Number.isFinite(hi) && hi > amount) rangeMax = hi;
+    }
+    hits.push({ amount, index: m.index, hasSymbol, hasK, rangeMax });
+  }
+  return hits;
+}
+
+/**
+ * Extract a salary figure. Strategy: collect numeric candidates, drop
+ * year-like values, prefer numbers near salary vocabulary, then numbers with
+ * an explicit currency symbol. Ranges resolve to their midpoint.
+ */
 function extractSalary(text: string): SalaryHit | undefined {
   const t = " " + text + " ";
   const currency = detectCurrency(t);
-  const salaryRe = /(?:£|€|¥|\$|₹|฿)?\s*(\d[\d,.]{3,})\s*(?:k)?(?:\s*[-–to]+\s*(\d[\d,.]{3,}))?/i;
-  const m = t.match(salaryRe);
-  if (!m) return undefined;
-  const raw = Number(m[1].replace(/,/g, ""));
-  if (!raw || raw < 500) return undefined;
 
-  const period: "month" | "year" = /per year|annual|p\.?a\.?|\/yr|yearly/i.test(t) || raw >= 30000 ? "year" : "month";
-  return { amount: raw, currency, period };
+  const candidates = collectNumberHits(t)
+    .filter((h) => !looksLikeYear(h.amount, h.hasSymbol, h.hasK))
+    .filter((h) => h.amount >= 500 && h.amount < 5_000_000);
+  if (candidates.length === 0) return undefined;
+
+  const nearSalaryWord = (h: NumberHit) => {
+    const from = Math.max(0, h.index - 80);
+    const ctx = t.slice(from, h.index + 90);
+    return SALARY_CONTEXT_RE.test(ctx);
+  };
+
+  const pick =
+    candidates.find((h) => nearSalaryWord(h)) ??
+    candidates.find((h) => h.hasSymbol || h.hasK) ??
+    undefined;
+  if (!pick) return undefined;
+
+  const amount = pick.rangeMax ? (pick.amount + pick.rangeMax) / 2 : pick.amount;
+  const period: "month" | "year" =
+    /per year|annual|p\.?a\.?|\/yr|yearly/i.test(t) || amount >= 30000 ? "year" : "month";
+  return { amount, currency, period };
 }
 
-const FX: Record<string, number> = {
-  USD: 1, GBP: 1.27, AED: 0.272, EUR: 1.08, SGD: 0.74, CNY: 0.138, THB: 0.028,
-  QAR: 0.275, SAR: 0.267, INR: 0.012, AUD: 0.713, MYR: 0.245, HKD: 0.128, JPY: 0.0062,
-};
-
-function toMonthlyUsd(hit: SalaryHit): number {
-  const usd = hit.amount * (FX[hit.currency] ?? 1);
+function toMonthlyUsd(hit: SalaryHit, fx: Record<string, number>): number {
+  const usd = hit.amount * (fx[hit.currency] ?? 1);
   return hit.period === "year" ? usd / 12 : usd;
 }
 
 export interface ParseOptions {
   html?: string;
   text?: string; // raw pasted text (when URL scraping fails)
+  /** Live school directory (Supabase mode) — falls back to the TSV seed. */
+  schools?: SchoolCandidate[];
+  /** Live FX map (currency -> USD multiplier) — falls back to static rates. */
+  fx?: Record<string, number>;
 }
 
 export function parseJobLink(rawUrl: string, opts: ParseOptions = {}): ParsedJob {
   const source = rawUrl ? detectSource(rawUrl) : "unknown";
   const html = opts.html ?? "";
   const pastedText = opts.text ?? "";
+  const fx = opts.fx ?? FX_RATES_STATIC;
   const plainText = stripHtml(html);
 
   // Combine all text sources for matching/extraction.
@@ -242,23 +325,24 @@ export function parseJobLink(rawUrl: string, opts: ParseOptions = {}): ParsedJob
     .filter(Boolean)
     .join("\n");
 
-  const matched = matchSchool(matchText);
+  const matched = matchSchool(matchText, opts.schools);
   const countryHint = COUNTRY_HINTS.find((h) => h.match.test(matchText));
 
   // 4. Extract salary: JSON-LD baseSalary > meta/text regex
   let offeredMonthlyUsd: number | undefined;
   if (jsonLd?.baseSalary) {
     const bs = jsonLd.baseSalary;
-    const amount = bs.value ?? bs.minValue ?? bs.maxValue ?? 0;
+    const value = bs.value;
+    const amount = value ?? (bs.minValue && bs.maxValue ? (bs.minValue + bs.maxValue) / 2 : bs.minValue ?? bs.maxValue ?? 0);
     if (amount > 0) {
       const currency = bs.currency || detectCurrency(combinedText);
       const period = /month/i.test(bs.unitText ?? "") ? "month" : (/year/i.test(bs.unitText ?? "") ? "year" : (amount >= 30000 ? "year" : "month"));
-      offeredMonthlyUsd = Math.round(toMonthlyUsd({ amount, currency, period }));
+      offeredMonthlyUsd = Math.round(toMonthlyUsd({ amount, currency, period }, fx));
     }
   }
   if (!offeredMonthlyUsd) {
-    const sal = extractSalary(combinedText) ?? extractSalary(metaText) ?? extractSalary(pastedText);
-    if (sal) offeredMonthlyUsd = Math.round(toMonthlyUsd(sal));
+    const sal = extractSalary(pastedText) ?? extractSalary(metaText) ?? extractSalary(combinedText);
+    if (sal) offeredMonthlyUsd = Math.round(toMonthlyUsd(sal, fx));
   }
 
   // 5. Extract role: JSON-LD title > regex
@@ -271,7 +355,8 @@ export function parseJobLink(rawUrl: string, opts: ParseOptions = {}): ParsedJob
     schoolName: matched?.name ?? jsonLd?.hiringOrganization,
     role,
     country: countryHint?.country ?? (jsonLd?.jobLocation ?? undefined),
-    matchedSchoolId: matched?.id,
+    // Routing key: the school page slug (equal to the id in TSV mode).
+    matchedSchoolId: matched?.slug,
   };
 
   if (offeredMonthlyUsd) {

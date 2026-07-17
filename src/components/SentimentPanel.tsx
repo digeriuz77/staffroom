@@ -10,11 +10,24 @@ interface Props {
   schoolName: string;
 }
 
+interface ThemeSummary {
+  label: string;
+  count: number;
+  sentiment: number;
+}
+
+interface TurnoverSummary {
+  strength: number;
+  rationale: string | null;
+}
+
 interface ApiResponse {
   count: number;
-  redditStatus: "live" | "fallback" | "unavailable";
+  redditStatus: "stored" | "live" | "fallback" | "unavailable";
   redditReason?: string;
   posts: SentimentPost[];
+  themes?: ThemeSummary[];
+  turnover?: TurnoverSummary | null;
 }
 
 export function SentimentPanel({ schoolId, schoolName }: Props) {
@@ -68,6 +81,43 @@ export function SentimentPanel({ schoolId, schoolName }: Props) {
         <StatusBadge status={data?.redditStatus} reason={data?.redditReason} />
       </div>
 
+      {data?.turnover && (
+        <div className="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-amber-300">
+            Turnover watch · {Math.round(data.turnover.strength * 100)}% signal
+          </p>
+          {data.turnover.rationale && (
+            <p className="mt-1 text-xs leading-relaxed text-amber-200/70">{data.turnover.rationale}</p>
+          )}
+        </div>
+      )}
+
+      {(data?.themes?.length ?? 0) > 0 && (
+        <div className="mb-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">
+            What teachers talk about
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {data!.themes!.slice(0, 6).map((t) => (
+              <span
+                key={t.label}
+                className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium ${
+                  t.sentiment >= 0.12
+                    ? "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-300"
+                    : t.sentiment <= -0.12
+                      ? "border-rose-500/20 bg-rose-500/[0.06] text-rose-300"
+                      : "border-white/10 bg-white/5 text-slate-300"
+                }`}
+                title={`${t.count} post${t.count !== 1 ? "s" : ""} · avg sentiment ${t.sentiment.toFixed(2)}`}
+              >
+                {t.label}
+                <span className="text-slate-500">{t.count}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {posts.length === 0 ? (
         <p className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-slate-400">
           No social sentiment found for this school yet. Be the first to share on r/InternationalTeachers.
@@ -87,6 +137,13 @@ export function SentimentPanel({ schoolId, schoolName }: Props) {
 }
 
 function StatusBadge({ status, reason }: { status?: string; reason?: string }) {
+  if (status === "stored") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-300">
+        <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" /> Tracked corpus
+      </span>
+    );
+  }
   if (status === "live") {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">

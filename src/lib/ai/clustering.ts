@@ -1,6 +1,6 @@
 // Clustering: assign embedded Reddit posts to themes via nearest-centroid to
 // keyword-seeded centroids, then write theme_clusters per school + time window.
-import { embedTexts } from "@/lib/ai/embeddings";
+import { embedTexts, hasEmbeddingsProvider, parseVector } from "@/lib/ai/embeddings";
 import { SENTIMENT_THEMES } from "@/lib/config/jobs";
 import { supabaseServer } from "@/lib/db/supabaseClients";
 import type { RedditPostRow } from "@/lib/db/types";
@@ -56,6 +56,11 @@ const WINDOW_DAYS = 90;
 export async function runClustering(payload: ClusterPayload): Promise<number> {
   const client = supabaseServer();
   if (!client) throw new Error("supabase not configured");
+  if (!hasEmbeddingsProvider()) {
+    // Centroids must come from the same model as stored post vectors.
+    console.warn("[cluster] no embeddings provider — skipping clustering run");
+    return 0;
+  }
 
   const centroids = await themeCentroids();
   const windowEnd = new Date();
@@ -89,10 +94,13 @@ export async function runClustering(payload: ClusterPayload): Promise<number> {
     const posts = (data as (Pick<RedditPostRow, "id" | "embedding" | "sentiment_score" | "themes" | "title" | "body">)[]) ?? [];
     if (posts.length === 0) continue;
 
-    // Bucket posts by assigned theme.
+    // Bucket posts by assigned theme. Posts without a vector carry no
+    // semantic signal — skip rather than pollute "Other".
     const buckets = new Map<string, { count: number; sentSum: number; posts: typeof posts }>();
     for (const p of posts) {
-      const theme = nearestTheme(p.embedding, centroids);
+      const vec = parseVector(p.embedding);
+      if (!vec) continue;
+      const theme = nearestTheme(vec, centroids);
       const b = buckets.get(theme) ?? { count: 0, sentSum: 0, posts: [] };
       b.count++;
       b.sentSum += p.sentiment_score ?? 0;

@@ -22,7 +22,9 @@ export type JobSource =
 
 export type SentimentSource = "reddit" | "glassdoor" | "facebook" | "instagram";
 
-export type SentimentProvenance = "live" | "static";
+export type SentimentProvenance = "live" | "static" | "stored";
+
+export type RecordTrustTier = "seed" | "unverified" | "email" | "school";
 
 export interface SalaryRecord {
   id: string;
@@ -37,6 +39,7 @@ export interface SalaryRecord {
   flights: boolean;
   taxRate: number | null;
   netMonthlyUsd: number;
+  trustTier: RecordTrustTier;
 }
 
 export interface School {

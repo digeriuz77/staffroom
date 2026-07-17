@@ -157,6 +157,41 @@ export interface RedditSearchResult {
   reason?: string;
 }
 
+/**
+ * Fetch the newest posts from a subreddit (sweep ingestion). Unlike
+ * searchSchoolOnReddit this does not treat the input as a school name.
+ */
+export async function fetchSubredditNew(subreddit: string, limit = 25): Promise<RedditSearchResult> {
+  if (!credentialsConfigured()) {
+    return { posts: [], source: "unavailable", reason: "no-credentials" };
+  }
+  const token = await getAccessToken();
+  if (!token) {
+    return { posts: [], source: "unavailable", reason: "auth-failed" };
+  }
+  const sub = subreddit.replace(/^r\//i, "").trim();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(
+      `https://oauth.reddit.com/r/${encodeURIComponent(sub)}/new?limit=${Math.min(100, Math.max(1, limit))}`,
+      {
+        headers: { Authorization: `Bearer ${token}`, "User-Agent": userAgent() },
+        signal: controller.signal,
+      },
+    );
+    if (res.status === 429) return { posts: [], source: "unavailable", reason: "rate-limited" };
+    if (!res.ok) return { posts: [], source: "unavailable", reason: `http-${res.status}` };
+    const data = (await res.json()) as RedditListing;
+    const posts = (data.data?.children ?? []).map(toSentimentPost);
+    return { posts, source: "live" };
+  } catch {
+    return { posts: [], source: "unavailable", reason: "network" };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function searchSchoolOnReddit(schoolName: string, limit = 8): Promise<RedditSearchResult> {
   if (!credentialsConfigured()) {
     return { posts: [], source: "unavailable", reason: "no-credentials" };

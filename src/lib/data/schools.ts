@@ -61,6 +61,7 @@ function parseRow(line: string, idx: number): SalaryRecord | null {
     flights,
     taxRate,
     netMonthlyUsd,
+    trustTier: "seed",
   };
 }
 

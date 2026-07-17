@@ -8,6 +8,7 @@ import { WebsiteHealthPanel } from "@/components/WebsiteHealthPanel";
 import { RolePreviewPanel } from "@/components/RolePreviewPanel";
 import { ProvenanceBadge, DataDisclaimer } from "@/components/ProvenanceBadge";
 import { OfferInput } from "@/components/OfferInput";
+import { CompareButton } from "@/components/CompareButton";
 import { ArrowIcon } from "@/components/icons";
 import { verdictTone, sentimentTone, TONE_CLASSES, pct } from "@/lib/tone";
 import { getTaxRateForCountry } from "@/lib/db/repo";
@@ -65,12 +66,7 @@ export default async function SchoolReport({ params, searchParams }: {
           {records.length} real salary record{records.length !== 1 ? "s" : ""} · data from {Math.min(...school.years)}–{Math.max(...school.years)}
         </p>
         <div className="mt-3 flex gap-2">
-          <Link
-            href={`/compare?schools=${school.slug}`}
-            className="inline-flex items-center gap-1 rounded-lg border border-indigo-400/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-200 transition hover:bg-indigo-500/20"
-          >
-            ⚖ Add to comparison
-          </Link>
+          <CompareButton slug={school.slug} name={school.name} city={school.city} country={school.country} />
         </div>
       </header>
 
@@ -133,7 +129,7 @@ export default async function SchoolReport({ params, searchParams }: {
                   <div>
                     <span className="text-slate-300">{r.role || "Teacher"}</span>
                     <span className="ml-2 text-xs text-slate-500">{r.year}</span>
-                    <ProvenanceBadge tier="seed" />
+                    <ProvenanceBadge tier={r.trustTier ?? "seed"} />
                   </div>
                   <div className="flex items-center gap-3">
                     {r.housing !== "None" && <span className="text-xs text-indigo-300">{r.housing}</span>}

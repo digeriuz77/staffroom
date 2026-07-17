@@ -64,14 +64,62 @@ src/components/             AuthProvider, AuthButton, CurrencyProvider, TanePane
 | 2026-07-11 | Role profiles (14 leadership roles) + inference engine; website health checker; expanded social sources (37-platform registry). |
 | 2026-07-13 | Security review: SSRF guard (safeFetch), N+1 fix (loadRecordsBySchool), regex injection fix, error propagation in reputation/bounty flows. Aesthetic polish (glass design system). |
 | 2026-07-14 | 65-test suite (safeFetch, websiteHealth, roleInference, currency, taxRates, platformRegistry). Minor fixes: clustering LIMIT, scraper date extraction. Created DEPLOYMENT.md, ROADMAP.md, ASSESSMENT.md. |
+| 2026-07-17 | **Major security + pipeline + product overhaul.** See below. |
+
+## 2026-07-17 Session — Security, Pipeline, and Product Overhaul
+
+### Migrations
+- **0007_security_lockdown_and_schema_fixes.sql**: Fixed RLS (submitters can no longer self-approve; col_items gets status + moderation); revoked public execute on worker RPCs; `reddit_posts.id` changed uuid→text (was blocking all Reddit ingest); `posting_baselines` unique constraint added; `salary_records.region` column added; school delete cascade→restrict + `merge_schools()` RPC; missing FK/filter indexes (pg_trgm for school search); jobs table autovacuum tuning + `prune_worker_tables()` retention.
+- **0008_membership_and_board.sql**: Profile membership fields (profile_kind, school_id, bio, public_profile); `school_members` table (school rep verification); `board_posts` table (community jobs board with RLS); `board_post_flags` table (community moderation); `expire_board_posts()` RPC.
+
+### Security fixes (Critical)
+- C1: Salary self-insert/update now constrained to `status='pending'`, `trust_tier in ('unverified','email')`, `source='user_submit'`.
+- C2: Dropped public-write policy on `country_tax_rates`.
+- C3: Revoked `claim_next_job`/`set_post_embedding`/`increment_reputation` from anon/authenticated.
+- C4: `col_items` now has `status` column + moderation flow.
+
+### Pipeline fixes
+- Reddit ingest: sweep mode now uses `fetchSubredditNew()` (was searching for subreddit name as a school) + resolves `school_id` from post text against the schools table.
+- Embeddings: removed hash fallback (was poisoning the corpus with non-semantic vectors); `embedUnembeddedPosts()` no-ops without a provider; `parseVector()` added for pgvector JSON string normalization; clustering skips posts without real vectors.
+- Sentiment API rewired to DB-first: reads stored `reddit_posts` + `theme_clusters` + `turnover_signals`; live Reddit only fills gaps; enqueues background `reddit_fetch` job when corpus is thin.
+- `SentimentPanel` now renders theme clusters + turnover signal + "Tracked corpus" badge.
+
+### Parser fixes
+- `matchSchool()` now accepts a live school directory (Supabase mode) — community-added schools are matchable.
+- Salary extraction: k-multiplier, year false-positive filtering, salary-context-aware candidate selection, range midpoints.
+- Live FX rates from `loadFxRates()` instead of hardcoded table.
+- `matchedSchoolId` returns the school slug (routing key) instead of the DB id.
+
+### UX fixes
+- `/manual` 404 eliminated: PasteLink fallback now switches to manual tab in-place with prefilled school query.
+- Compare page rebuilt: card-based comparison (not table), persistent localStorage tray, array-param crash fixed, school search on compare page.
+- `CompareTray` (floating bar) + `CompareButton` (school page) added to layout.
+- Provenance badges now use the record's actual `trust_tier` (was hardcoded "seed").
+- Footer added; AuthButton shows Account link when signed in.
+- About page rewritten to reflect actual product (DB-first sentiment, trust tiers, board, comparison).
+- Home page updated with board link + 4 feature cards.
+
+### New features
+- **Jobs board** (`/board`): list + detail + new post pages; API with honeypot, dwell-time token (HMAC), rate limiting (5/day), duplicate detection, community flagging (auto-remove at 3 flags).
+- **Account/membership page** (`/account`): profile editing (name, kind, currency, bio, public profile), school affiliation (self-join, pending verification), reputation display, sign-out.
+- Board post expiry + worker table pruning added to daily cron.
+
+### Code hygiene
+- Seed script made idempotent (delete-then-insert for seed rows).
+- `db/types.ts` updated: `region` on SalaryRecordRow, `status` on ColItemRow, profile membership fields, `country_tax_rates`/`school_members`/`board_posts`/`board_post_flags` table types, new RPC signatures.
+- `getSalaryRecordsForRegion` gracefully falls back when `region` column is absent (pre-0007 databases).
+
+### Validation
+- typecheck: exit 0
+- lint: exit 0
+- tests: 65 pass, 0 fail
 
 ## Pending / Next
-- Deploy: set Supabase env vars, run `0001–0005` migrations, `bun db:seed`, `bun db:parity`, deploy worker to Railway with REDDIT_*/EMBEDDINGS_* creds.
-- **Cutover read paths from TSV to Supabase** (repo.ts ready; UI still on sync TSV for now). This is the top priority per ASSESSMENT.md.
-- Moderation queue UI + role-gated approve route (logic in `submissions.ts`).
-- Wire `SentimentPanel` to `getClusteredThemes` when Supabase live.
-- Comparison view (Tier 1.1 in ROADMAP.md) — the #1 missing user flow.
+- Deploy: run migrations 0001–0008 in order, `bun db:seed`, `bun db:parity`, deploy worker with REDDIT_*/EMBEDDINGS_* creds.
+- Moderation queue UI (logic exists in `submissions.ts`; needs a `/moderate` page).
 - Add CI/CD pipeline (GitHub Actions: lint + test + typecheck).
+- Contract clause analyzer (Tier 3.1 in ROADMAP.md).
+- School profile enrichment from accreditation directories (Tier 2.4).
 
 ## Key Documentation
 - `DEPLOYMENT.md` — full deployment guide (Vercel + Supabase + Railway)

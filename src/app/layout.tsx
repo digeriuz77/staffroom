@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteNav } from "@/components/SiteNav";
+import { SiteFooter } from "@/components/SiteFooter";
 import { AuthProvider } from "@/components/AuthProvider";
 import { CurrencyProvider } from "@/components/CurrencyProvider";
+import { CompareTray } from "@/components/CompareTray";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -22,6 +24,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <CurrencyProvider>
             <SiteNav />
             {children}
+            <SiteFooter />
+            <CompareTray />
           </CurrencyProvider>
         </AuthProvider>
       </body>

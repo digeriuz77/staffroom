@@ -49,6 +49,7 @@ export function rowToSalaryRecord(row: SalaryRecordRow): SalaryRecord {
     flights: row.flights,
     taxRate,
     netMonthlyUsd,
+    trustTier: row.trust_tier ?? "unverified",
   };
 }
 
@@ -212,13 +213,59 @@ export async function getSalaryRecordsForRegion(region: Region): Promise<SalaryR
     return SALARIES.filter((r) => regionOfCountry(r.country) === region);
   }
   const client = supabaseServer()!;
-  const { data } = await client
+  const { data, error } = await client
     .from("salary_records")
     .select("*")
     .eq("region", region)
     .eq("status", "approved");
-  return ((data as SalaryRecordRow[]) ?? []).map(rowToSalaryRecord);
+  if (error || !data) {
+    // Pre-0007 databases lack the region column; degrade to country-of-region.
+    const { data: all } = await client
+      .from("salary_records")
+      .select("*")
+      .eq("status", "approved");
+    return ((all as SalaryRecordRow[]) ?? [])
+      .filter((r) => regionOfCountry(r.country) === region)
+      .map(rowToSalaryRecord);
+  }
+  return (data as SalaryRecordRow[]).map(rowToSalaryRecord);
 }
+
+// ---------------------------------------------------------------------------
+// Lightweight school directory (for link parsing / matching) + FX
+// ---------------------------------------------------------------------------
+
+export interface SchoolLite {
+  id: string;
+  slug: string;
+  name: string;
+  city: string;
+  country: string;
+}
+
+async function fetchSchoolDirectory(): Promise<SchoolLite[]> {
+  if (!supabaseEnabled()) {
+    return deriveSchools().map(({ school }) => ({
+      id: school.id,
+      slug: school.slug,
+      name: school.name,
+      city: school.city,
+      country: school.country,
+    }));
+  }
+  const client = supabaseServer()!;
+  const { data } = await client.from("schools").select("id, slug, name, city, country");
+  return ((data as SchoolLite[]) ?? []);
+}
+
+/** Cached slim directory of all schools — used by the job-link matcher. */
+export const getSchoolDirectory = unstable_cache(
+  fetchSchoolDirectory,
+  ["school-directory"],
+  { revalidate: 3600 },
+);
+
+
 
 // ---------------------------------------------------------------------------
 // Cost of living

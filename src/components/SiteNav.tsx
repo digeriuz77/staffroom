@@ -18,6 +18,7 @@ export function SiteNav() {
         <div className="flex items-center gap-1 text-sm">
           <NavLink href="/schools">Schools</NavLink>
           <NavLink href="/compare">Compare</NavLink>
+          <NavLink href="/board">Board</NavLink>
           <NavLink href="/purchasing-power">Purchasing Power</NavLink>
           <NavLink href="/submit">Contribute</NavLink>
           <NavLink href="/about">About</NavLink>

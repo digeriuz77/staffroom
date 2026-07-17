@@ -103,12 +103,15 @@ async function seed() {
   const slugToId = new Map<string, string>();
   for (const s of schoolData) slugToId.set(s.slug, s.id);
 
-  // 3. Insert salary records (map slug -> school_id)
+  // 3. Insert salary records (map slug -> school_id). Delete old seed rows
+  //    first so re-running doesn't duplicate the dataset.
   const salaryPayload = SALARIES.map((r) => {
     const slug = slugify(`${r.school} ${r.city} ${r.country}`);
     const id = slugToId.get(slug);
     return { ...salaryRow(r), school_id: id ?? null };
   });
+  console.log(`Clearing old seed salary records...`);
+  await client.from("salary_records").delete().eq("source", "tsv_seed");
   console.log(`Inserting ${salaryPayload.length} salary records...`);
   const { error: salErr } = await client.from("salary_records").insert(salaryPayload);
   if (salErr) {
@@ -116,7 +119,7 @@ async function seed() {
     process.exit(1);
   }
 
-  // 4. Insert cost-of-living items
+  // 4. Insert cost-of-living items (same idempotency guard).
   const colPayload = COST_OF_LIVING.map((c) => ({
     city: c.city,
     country: c.country,
@@ -133,6 +136,8 @@ async function seed() {
     source: "seed",
     trust_tier: "seed",
   }));
+  console.log(`Clearing old seed COL items...`);
+  await client.from("col_items").delete().eq("source", "seed");
   console.log(`Inserting ${colPayload.length} cost-of-living items...`);
   const { error: colErr } = await client.from("col_items").insert(colPayload);
   if (colErr) {

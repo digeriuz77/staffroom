@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { safeFetch } from "@/lib/net/safeFetch";
 import { parseJobLink } from "@/lib/parser/jobLink";
+import { getSchoolDirectory } from "@/lib/db/repo";
+import { loadFxRates } from "@/lib/finance/currency";
 
 export const runtime = "nodejs";
 
@@ -19,15 +21,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Either a URL or pasted job description text is required" }, { status: 400 });
   }
 
-  // Fetch HTML if a URL is provided (may fail due to scraping blocks — that's OK).
-  let html = "";
-  if (url) {
-    const result = await safeFetch(url, { timeoutMs: 6000 });
-    if (result.ok) html = result.text;
-  }
+  // Fetch HTML (may fail due to scraping blocks — that's OK) alongside the
+  // live school directory + FX rates used for matching and conversion.
+  const [fetched, schools, fx] = await Promise.all([
+    url ? safeFetch(url, { timeoutMs: 6000 }) : Promise.resolve(null),
+    getSchoolDirectory(),
+    loadFxRates(),
+  ]);
+  const html = fetched?.ok ? fetched.text : "";
 
   // Parse from whatever sources we have: fetched HTML + pasted text.
-  const parsed = parseJobLink(url, { html, text: pastedText });
+  const parsed = parseJobLink(url, { html, text: pastedText, schools, fx });
 
   // If we got nothing useful and there's pasted text, surface it as a signal.
   if (!parsed.matchedSchoolId && !parsed.offeredMonthlyUsd && pastedText) {

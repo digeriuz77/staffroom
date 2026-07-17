@@ -3,8 +3,10 @@ import { buildSalaryReportAsync, formatUsd } from "@/lib/analysis/salary";
 import { getTaxRateForCountry, getSchools } from "@/lib/db/repo";
 import { verdictTone, TONE_CLASSES } from "@/lib/tone";
 import { DataDisclaimer } from "@/components/ProvenanceBadge";
+import { CompareSchoolSearch } from "@/components/CompareSchoolSearch";
 import type { Metadata } from "next";
 import type { SalaryReport } from "@/lib/analysis/salary";
+import type { ColItem } from "@/lib/types";
 
 export const metadata: Metadata = {
   title: "Compare Schools — Staffroom Intel",
@@ -16,20 +18,21 @@ export const dynamic = "force-dynamic";
 interface CompareEntry {
   slug: string;
   report: SalaryReport | null;
-  taxRate: { takeHomePct: number; taxRegime: string } | null;
+  taxRate: { takeHomePct: number; taxRegime: string; effectiveRate: number } | null;
+}
+
+function normalizeSlugs(raw: string | string[] | undefined): string[] {
+  const list = Array.isArray(raw) ? raw : (raw ?? "").split(",");
+  return list.map((s) => s.trim()).filter(Boolean).slice(0, 3);
 }
 
 export default async function ComparePage({
   searchParams,
 }: {
-  searchParams: Promise<{ schools?: string }>;
+  searchParams: Promise<{ schools?: string | string[] }>;
 }) {
-  const { schools: schoolsParam } = await searchParams;
-  const slugs = (schoolsParam ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .slice(0, 3);
+  const sp = await searchParams;
+  const slugs = normalizeSlugs(sp.schools);
 
   const entries: CompareEntry[] = await Promise.all(
     slugs.map(async (slug) => {
@@ -38,159 +41,62 @@ export default async function ComparePage({
       return {
         slug,
         report,
-        taxRate: taxRate ? { takeHomePct: taxRate.takeHomePct, taxRegime: taxRate.taxRegime } : null,
+        taxRate: taxRate
+          ? {
+              takeHomePct: taxRate.takeHomePct,
+              taxRegime: taxRate.taxRegime,
+              effectiveRate: taxRate.effectiveRate,
+            }
+          : null,
       } satisfies CompareEntry;
     }),
   );
 
-  const hasData = entries.some((e) => e.report);
+  const validEntries = entries.filter((e) => e.report);
+  const hasData = validEntries.length > 0;
+
+  // Compute "best" indices for highlighting.
+  const bestMedianIdx = bestIndex(validEntries, (e) => e.report?.schoolStats.median);
+  const bestTakeHomeIdx = bestIndex(validEntries, (e) => e.taxRate?.takeHomePct);
+  const bestBuyingPowerIdx = bestIndex(validEntries, (e) => e.report?.col?.buyingPowerUsd);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
       <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">Compare schools</h1>
         <p className="mt-2 text-slate-400">
-          Side-by-side salary packages, tax regimes, and cost of living — pick up to 3 schools.
+          Side-by-side salary packages, tax regimes, and cost of living. Pick up to 3 schools from the browse page or search below.
         </p>
       </header>
 
-      <SchoolPicker />
+      <CompareSchoolSearch />
 
-      {hasData && entries.length > 0 && (
-        <div className="mt-8 overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-white/10">
-                <th className="w-40 py-3 pr-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Metric
-                </th>
-                {entries.map((e) => (
-                  <th key={e.slug} className="py-3 px-3 text-left">
-                    {e.report ? (
-                      <Link href={`/school/${e.slug}`} className="block">
-                        <span className="text-sm font-semibold text-white hover:text-indigo-300">
-                          {e.report.school.name}
-                        </span>
-                        <span className="block text-xs text-slate-500">
-                          {e.report.school.city}, {e.report.school.country}
-                        </span>
-                      </Link>
-                    ) : (
-                      <span className="text-sm text-slate-600">Not found</span>
-                    )}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {entries.some((e) => e.report?.schoolStats) && (
-                <>
-                  <CompareRow
-                    label="Records"
-                    entries={entries}
-                    render={(r) => `${r.records.length}`}
-                  />
-                  <CompareRow
-                    label="School median (net/mo)"
-                    entries={entries}
-                    render={(r) => formatUsd(r.schoolStats.median, true)}
-                    highlight={(reports) => {
-                      const vals = reports.filter((r) => r).map((r) => r!.schoolStats.median);
-                      if (vals.length < 2) return -1;
-                      return vals.indexOf(Math.max(...vals));
-                    }}
-                  />
-                  <CompareRow
-                    label="Country median (net/mo)"
-                    entries={entries}
-                    render={(r) => formatUsd(r.countryStats.median, true)}
-                  />
-                  <CompareRow
-                    label="Region median (net/mo)"
-                    entries={entries}
-                    render={(r) => formatUsd(r.regionStats.median, true)}
-                  />
-                  <CompareRow
-                    label="Country P25–P75"
-                    entries={entries}
-                    render={(r) => `${formatUsd(r.countryStats.p25, true)} – ${formatUsd(r.countryStats.p75, true)}`}
-                  />
-                </>
-              )}
-              {entries.some((e) => e.taxRate) && (
-                <>
-                  <CompareRow
-                    label="Tax regime"
-                    entries={entries}
-                    render={(r, i) => entries[i].taxRate?.taxRegime ?? "—"}
-                  />
-                  <CompareRow
-                    label="Take-home %"
-                    entries={entries}
-                    render={(r, i) => `${Math.round((entries[i].taxRate?.takeHomePct ?? 0) * 100)}%`}
-                    highlight={(reports) => {
-                      const vals = entries.map((e) => e.taxRate?.takeHomePct ?? 0);
-                      if (vals.length < 2) return -1;
-                      return vals.indexOf(Math.max(...vals));
-                    }}
-                  />
-                </>
-              )}
-              {entries.some((e) => e.report?.col) && (
-                <>
-                  <CompareRow
-                    label="COL index"
-                    entries={entries}
-                    render={(r) => (r.col ? `${r.col.colIndex} (London=100)` : "—")}
-                  />
-                  <CompareRow
-                    label="Buying power (net/mo)"
-                    entries={entries}
-                    render={(r) => (r.col ? formatUsd(r.col.buyingPowerUsd, true) : "—")}
-                    highlight={(reports) => {
-                      const vals = reports.map((r) => r?.col?.buyingPowerUsd ?? 0).filter((v) => v > 0);
-                      if (vals.length < 2) return -1;
-                      const max = Math.max(...vals);
-                      return reports.findIndex((r) => r?.col?.buyingPowerUsd === max);
-                    }}
-                  />
-                  <CompareRow
-                    label="Beer cost"
-                    entries={entries}
-                    render={(r) => (r.col ? `$${r.col.beer.toFixed(0)}` : "—")}
-                  />
-                  <CompareRow
-                    label="Gym / mo"
-                    entries={entries}
-                    render={(r) => (r.col ? `$${r.col.gym.toFixed(0)}` : "—")}
-                  />
-                </>
-              )}
-              {entries.some((e) => e.report?.offer) && (
-                <CompareRow
-                  label="Offer verdict"
-                  entries={entries}
-                  render={(r) => {
-                    if (!r.offer) return "—";
-                    const tone = verdictTone(r.offer.verdict);
-                    const cls = TONE_CLASSES[tone];
-                    return r.offer.verdict;
-                  }}
-                  cellClass={(r) => {
-                    if (!r?.offer) return "";
-                    const tone = verdictTone(r.offer.verdict);
-                    return TONE_CLASSES[tone].text;
-                  }}
-                />
-              )}
-            </tbody>
-          </table>
+      {hasData && (
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {entries.map((e, i) => (
+            <SchoolCard
+              key={e.slug}
+              entry={e}
+              isBestMedian={i === bestMedianIdx}
+              isBestTakeHome={i === bestTakeHomeIdx}
+              isBestBuyingPower={i === bestBuyingPowerIdx}
+            />
+          ))}
         </div>
       )}
 
-      {!hasData && (
+      {!hasData && slugs.length > 0 && (
         <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center text-sm text-slate-400">
-          Select schools above to compare. Add up to 3 from the browse page.
+          No matching schools found for: {slugs.join(", ")}. Try searching above or browsing the{" "}
+          <Link href="/schools" className="text-indigo-300 hover:text-indigo-200">schools directory</Link>.
+        </div>
+      )}
+
+      {!hasData && slugs.length === 0 && (
+        <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center text-sm text-slate-400">
+          Select schools above or from the{" "}
+          <Link href="/schools" className="text-indigo-300 hover:text-indigo-200">browse page</Link>{" "}
+          to start comparing. You can compare up to 3 at once.
         </div>
       )}
 
@@ -201,80 +107,146 @@ export default async function ComparePage({
   );
 }
 
-function CompareRow({
-  label,
-  entries,
-  render,
-  highlight,
-  cellClass,
-}: {
-  label: string;
-  entries: CompareEntry[];
-  render: (report: SalaryReport, index: number) => string;
-  highlight?: (reports: (SalaryReport | null)[]) => number;
-  cellClass?: (report: SalaryReport | null) => string;
-}) {
-  const reports = entries.map((e) => e.report);
-  const highlightIdx = highlight ? highlight(reports) : -1;
-  return (
-    <tr>
-      <td className="py-2.5 pr-4 text-xs font-medium text-slate-500">{label}</td>
-      {entries.map((e, i) => {
-        const r = e.report;
-        if (!r) return <td key={i} className="py-2.5 px-3 text-slate-600">—</td>;
-        const isBest = i === highlightIdx;
-        const extra = cellClass?.(r) ?? "";
-        return (
-          <td key={i} className={`py-2.5 px-3 ${isBest ? "font-bold text-emerald-300" : "text-slate-300"} ${extra}`}>
-            {render(r, i)}
-            {isBest && <span className="ml-1 text-[10px] text-emerald-400/60">★</span>}
-          </td>
-        );
-      })}
-    </tr>
-  );
+function bestIndex(entries: CompareEntry[], getter: (e: CompareEntry) => number | undefined | null): number {
+  const vals = entries.map((e) => getter(e) ?? -Infinity);
+  if (vals.length < 2) return -1;
+  const max = Math.max(...vals);
+  if (max === -Infinity) return -1;
+  return vals.indexOf(max);
 }
 
-async function SchoolPicker() {
-  const allSchools = await getSchools();
+function SchoolCard({
+  entry,
+  isBestMedian,
+  isBestTakeHome,
+  isBestBuyingPower,
+}: {
+  entry: CompareEntry;
+  isBestMedian: boolean;
+  isBestTakeHome: boolean;
+  isBestBuyingPower: boolean;
+}) {
+  const { report, taxRate } = entry;
+  if (!report) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+        <p className="text-sm text-slate-600">School not found: {entry.slug}</p>
+      </div>
+    );
+  }
+
+  const { school, schoolStats, countryStats, regionStats, col } = report;
+
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-      <p className="mb-3 text-xs font-medium uppercase tracking-wider text-slate-500">
-        Add schools to compare
-      </p>
-      <SchoolPickerClient schools={allSchools.map((s) => ({ slug: s.school.slug, name: s.school.name, city: s.school.city, country: s.school.country }))} />
+    <div className="flex flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+      {/* Header */}
+      <Link href={`/school/${entry.slug}`} className="block">
+        <h2 className="text-lg font-bold text-white transition hover:text-indigo-300">{school.name}</h2>
+        <p className="text-xs text-slate-500">{school.city}, {school.country}</p>
+      </Link>
+
+      <div className="mt-1 flex flex-wrap gap-1.5">
+        {school.curricula.map((c) => (
+          <span key={c} className="rounded-md bg-indigo-500/10 px-1.5 py-0.5 text-[10px] text-indigo-300">{c}</span>
+        ))}
+        <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-400">{school.region}</span>
+      </div>
+
+      {/* Records */}
+      <div className="mt-4 flex items-baseline gap-2">
+        <span className="text-2xl font-bold text-white">{report.records.length}</span>
+        <span className="text-xs text-slate-500">salary records</span>
+      </div>
+
+      {/* Salary stats */}
+      <div className="mt-4 space-y-2.5 border-t border-white/5 pt-4">
+        <Metric
+          label="School median (net/mo)"
+          value={formatUsd(schoolStats.median, true)}
+          highlight={isBestMedian}
+        />
+        <Metric label="Country median" value={formatUsd(countryStats.median, true)} />
+        <Metric label="Region median" value={formatUsd(regionStats.median, true)} />
+        <Metric
+          label="Country P25–P75"
+          value={`${formatUsd(countryStats.p25, true)} – ${formatUsd(countryStats.p75, true)}`}
+        />
+      </div>
+
+      {/* Tax regime */}
+      {taxRate && (
+        <div className="mt-4 space-y-2.5 border-t border-white/5 pt-4">
+          <Metric label="Tax regime" value={taxRate.taxRegime} />
+          <Metric
+            label="Take-home %"
+            value={`${Math.round(taxRate.takeHomePct * 100)}%`}
+            highlight={isBestTakeHome}
+          />
+          <p className="text-[11px] text-slate-600">
+            ~{Math.round(taxRate.effectiveRate * 100)}% effective tax
+          </p>
+        </div>
+      )}
+
+      {/* Cost of living */}
+      {col && (
+        <div className="mt-4 space-y-2.5 border-t border-white/5 pt-4">
+          <Metric label="COL index" value={`${col.colIndex} (London=100)`} />
+          <Metric
+            label="Buying power (net/mo)"
+            value={formatUsd(col.buyingPowerUsd, true)}
+            highlight={isBestBuyingPower}
+          />
+          <div className="grid grid-cols-3 gap-2 pt-1">
+            <MiniMetric label="Beer" value={`$${col.beer.toFixed(0)}`} />
+            <MiniMetric label="Gym/mo" value={`$${col.gym.toFixed(0)}`} />
+            <MiniMetric label="Meal" value={`$${col.meal.toFixed(0)}`} />
+          </div>
+        </div>
+      )}
+
+      {/* Offer verdict */}
+      {report.offer && (
+        <div className="mt-4 border-t border-white/5 pt-4">
+          <p className="text-xs text-slate-500">Offer verdict</p>
+          <p className={`text-base font-bold ${TONE_CLASSES[verdictTone(report.offer.verdict)].text}`}>
+            {report.offer.verdict}
+          </p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {formatUsd(report.offer.offeredMonthlyUsd)}/mo · {Math.round(report.offer.percentileVsCountry)}%ile
+          </p>
+        </div>
+      )}
+
+      <div className="mt-auto pt-4">
+        <Link
+          href={`/school/${entry.slug}`}
+          className="text-xs font-medium text-indigo-300 transition hover:text-indigo-200"
+        >
+          View full report →
+        </Link>
+      </div>
     </div>
   );
 }
 
-function SchoolPickerClient({ schools }: { schools: { slug: string; name: string; city: string; country: string }[] }) {
-  // This is a server-rendered form that redirects with query params.
-  // Kept simple — no client JS needed for low-usage.
+function Metric({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <form action="/compare" method="get" className="flex flex-wrap gap-2">
-      <input type="hidden" name="action" value="compare" />
-      {schools.slice(0, 0).map(() => null)}
-      <select
-        name="schools"
-        multiple
-        size={6}
-        className="min-w-[280px] flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-indigo-400/40 focus:outline-none"
-      >
-        {schools.map((s) => (
-          <option key={s.slug} value={s.slug} className="bg-[#0c0f17]">
-            {s.name} — {s.city}, {s.country}
-          </option>
-        ))}
-      </select>
-      <div className="flex flex-col gap-2">
-        <button
-          type="submit"
-          className="rounded-xl bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400"
-        >
-          Compare selected →
-        </button>
-        <p className="text-[11px] text-slate-500">Hold Ctrl/Cmd to select up to 3</p>
-      </div>
-    </form>
+    <div className="flex items-center justify-between">
+      <span className="text-xs text-slate-500">{label}</span>
+      <span className={`text-sm font-semibold ${highlight ? "text-emerald-300" : "text-slate-200"}`}>
+        {value}
+        {highlight && <span className="ml-1 text-[10px] text-emerald-400/60">★</span>}
+      </span>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-white/5 bg-white/[0.02] px-2 py-1.5 text-center">
+      <p className="text-[10px] text-slate-600">{label}</p>
+      <p className="text-xs font-semibold text-white">{value}</p>
+    </div>
   );
 }

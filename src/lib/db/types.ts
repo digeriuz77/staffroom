@@ -39,6 +39,10 @@ export interface ProfileRow {
   household: Household;
   reputation_points: number;
   role: UserRole;
+  profile_kind: "teacher" | "school_staff" | "recruiter";
+  school_id: string | null;
+  bio: string | null;
+  public_profile: boolean;
   created_at: string;
 }
 
@@ -96,6 +100,7 @@ export interface SalaryRecordRow {
   submitted_at: string;
   reviewed_at: string | null;
   reviewer_id: string | null;
+  region: string | null;
 }
 
 export interface TaneComponentRow {
@@ -126,6 +131,7 @@ export interface ColItemRow {
   trust_tier: TrustTier;
   submitter_id: string | null;
   submitted_at: string;
+  status: SubmissionStatus;
 }
 
 export interface MarketRentRow {
@@ -235,6 +241,56 @@ export interface FxRateRow {
   fetched_at: string;
 }
 
+export interface CountryTaxRateRow {
+  id: string;
+  country: string;
+  currency: string;
+  effective_rate: number;
+  social_insurance_rate: number | null;
+  tax_regime: string;
+  take_home_pct: number;
+  special_notes: string | null;
+  source: string;
+  updated_at: string;
+}
+
+export interface SchoolMemberRow {
+  id: string;
+  school_id: string;
+  user_id: string;
+  member_role: "rep" | "admin";
+  verified: boolean;
+  created_at: string;
+}
+
+export interface BoardPostRow {
+  id: string;
+  author_id: string;
+  school_id: string | null;
+  school_name: string;
+  title: string;
+  body: string;
+  country: string;
+  city: string | null;
+  role_type: string;
+  salary_min_usd: number | null;
+  salary_max_usd: number | null;
+  currency: string;
+  apply_url: string | null;
+  contact_email: string | null;
+  status: "active" | "expired" | "removed";
+  created_at: string;
+  expires_at: string;
+}
+
+export interface BoardPostFlagRow {
+  id: string;
+  post_id: string;
+  reporter_id: string;
+  reason: string;
+  created_at: string;
+}
+
 // Canonical Supabase typed-client table shape. Insert/Update are derived as
 // Partial<Row> since Postgres defaults enforce the real constraints.
 export interface Table<R> {
@@ -264,6 +320,10 @@ export interface Database {
       bounties: Table<BountyRow>;
       jobs: Table<JobRow>;
       fx_rates: Table<FxRateRow>;
+      country_tax_rates: Table<CountryTaxRateRow>;
+      school_members: Table<SchoolMemberRow>;
+      board_posts: Table<BoardPostRow>;
+      board_post_flags: Table<BoardPostFlagRow>;
     };
     Views: Record<string, never>;
     Functions: {
@@ -274,6 +334,22 @@ export interface Database {
       set_post_embedding: {
         Args: { p_id: string; p_vec: number[] };
         Returns: void;
+      };
+      increment_reputation: {
+        Args: { p_user: string; p_points: number };
+        Returns: void;
+      };
+      merge_schools: {
+        Args: { p_keep: string; p_remove: string };
+        Returns: void;
+      };
+      prune_worker_tables: {
+        Args: Record<string, never>;
+        Returns: void;
+      };
+      expire_board_posts: {
+        Args: Record<string, never>;
+        Returns: number;
       };
     };
     Enums: Record<string, string>;

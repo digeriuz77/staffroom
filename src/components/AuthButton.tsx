@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 
 export function AuthButton() {
@@ -20,12 +21,20 @@ export function AuthButton() {
 
   if (session) {
     return (
-      <button
-        onClick={() => signOut()}
-        className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:text-white"
-      >
-        Sign out
-      </button>
+      <div className="flex items-center gap-2">
+        <Link
+          href="/account"
+          className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:text-white"
+        >
+          Account
+        </Link>
+        <button
+          onClick={() => signOut()}
+          className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:text-white"
+        >
+          Sign out
+        </button>
+      </div>
     );
   }
 

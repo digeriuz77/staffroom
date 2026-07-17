@@ -1,6 +1,6 @@
 // Embeddings client. Default: text-embedding-3-small (1536-dim), behind an
 // interface so the provider is swappable. Batched; no-ops if no API key.
-import { embeddingsConfig, EMBEDDING_DIM } from "@/lib/config/jobs";
+import { embeddingsConfig } from "@/lib/config/jobs";
 import type { RedditPostRow } from "@/lib/db/types";
 import { supabaseServer } from "@/lib/db/supabaseClients";
 
@@ -34,48 +34,54 @@ function getProvider(): EmbeddingsProvider | null {
   return provider;
 }
 
-/**
- * Fallback deterministic hashing embedding so clustering can run without an
- * API key (lower quality, but keeps the pipeline functional). NOT semantic.
- */
-function hashEmbed(text: string): number[] {
-  const vec = new Array(EMBEDDING_DIM).fill(0);
-  const tokens = text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
-  for (const tok of tokens) {
-    let h = 0;
-    for (let i = 0; i < tok.length; i++) h = (h * 31 + tok.charCodeAt(i)) >>> 0;
-    vec[h % EMBEDDING_DIM] += 1;
-    vec[(h >> 8) % EMBEDDING_DIM] += 0.5;
-  }
-  // L2 normalize
-  const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0)) || 1;
-  return vec.map((v) => v / norm);
+/** True when a real embeddings provider is configured. */
+export function hasEmbeddingsProvider(): boolean {
+  return getProvider() !== null;
 }
 
+/**
+ * Embed texts with the configured provider. Throws when no provider is
+ * configured or a batch fails: persisting non-semantic placeholder vectors
+ * would permanently poison the corpus (rows are only embedded once), so
+ * failing loudly and retrying later is the correct behavior.
+ */
 export async function embedTexts(texts: string[]): Promise<number[][]> {
   const p = getProvider();
-  if (!p || texts.length === 0) return texts.map(hashEmbed);
+  if (texts.length === 0) return [];
+  if (!p) throw new Error("embeddings provider not configured (EMBEDDINGS_API_KEY)");
   // Batch in groups of 64.
   const out: number[][] = [];
   for (let i = 0; i < texts.length; i += 64) {
-    const batch = texts.slice(i, i + 64);
-    try {
-      out.push(...(await p.embed(batch)));
-    } catch (e) {
-      console.warn("[embeddings] provider failed, using hash fallback:", e);
-      out.push(...batch.map(hashEmbed));
-    }
+    out.push(...(await p.embed(texts.slice(i, i + 64))));
   }
   return out;
+}
+
+/** pgvector columns come back from PostgREST as JSON strings — normalize. */
+export function parseVector(value: unknown): number[] | null {
+  if (Array.isArray(value)) return value as number[];
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return Array.isArray(parsed) ? (parsed as number[]) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 const EMBED_BATCH = 50;
 
 /**
  * Embed Reddit posts that lack vectors. Writes the embedding column via RPC
- * (pgvector arrays need a typed cast).
+ * (pgvector arrays need a typed cast). No-ops without a provider.
  */
 export async function embedUnembeddedPosts(): Promise<number> {
+  if (!hasEmbeddingsProvider()) {
+    console.warn("[embeddings] no provider configured — skipping (posts stay unembedded)");
+    return 0;
+  }
   const client = supabaseServer();
   if (!client) throw new Error("supabase not configured");
   const { data, error } = await client
