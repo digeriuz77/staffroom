@@ -21,6 +21,8 @@ seeding, worker configuration, and operational procedures for Staffroom Intel.
 │   • Server Components     │        │   • Postgres + pgvector   │
 │   • Client interactivity  │        │   • Row-Level Security    │
 │   • FX / TANE / sentiment │        │   • Jobs queue table      │
+│   • Jobs board + account  │        │   • Board posts + flags   │
+│   • Enqueues fetch jobs   │        │   • School members        │
 └───────────┬──────────────┘        └──────────┬───────────────┘
             │                                  │
             │ enqueue job                      │ claim job (SKIP LOCKED)
@@ -33,6 +35,7 @@ seeding, worker configuration, and operational procedures for Staffroom Intel.
 │   • Reddit fetch → embed → cluster                           │
 │   • Job-board scraper → baseline → turnover signals          │
 │   • FX refresh, gap detection, reputation awards             │
+│   • Board post expiry + worker table pruning                 │
 │   • Redis NOT required — Postgres IS the queue               │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -80,8 +83,10 @@ Visit `http://localhost:3000`. You'll see:
 - Purchasing power tool, school browse, school reports
 - Reddit sentiment (falls back to curated static posts without credentials)
 
-Features that require Supabase (auth, submissions, bounties, worker jobs) will
-show a "not configured" notice but won't crash.
+Features that require Supabase (auth, submissions, bounties, jobs board,
+account, worker jobs) will show a "not configured" notice but won't crash.
+The TSV fallback covers salary data, tax rates, FX, cost of living, school
+reports, and the purchasing-power tool.
 
 ```bash
 bun test        # 65 tests across 6 files
@@ -114,7 +119,7 @@ for f in supabase/migrations/0*.sql; do
 done
 
 # Option B: Supabase Dashboard → SQL Editor
-# Paste each migration file's contents in order: 0001 → 0005
+# Paste each migration file's contents in order: 0001 → 0008
 ```
 
 Migration summary:
@@ -126,6 +131,14 @@ Migration summary:
 | `0003_set_embedding_rpc.sql` | `set_post_embedding()` function (pgvector cast) |
 | `0004_reputation_and_profile_trigger.sql` | `increment_reputation()`, auto-profile on signup |
 | `0005_tax_rates_and_fx_seed.sql` | 90+ country tax rates + 90+ currency FX rates |
+| `0006_stale_job_reaper.sql` | Reclaims jobs stuck in `running` for > 10 min |
+| `0007_security_lockdown_and_schema_fixes.sql` | RLS lockdown, `reddit_posts.id` text, `region` column, `merge_schools()` RPC, FK indexes, jobs retention |
+| `0008_membership_and_board.sql` | Profile membership fields, `school_members`, `board_posts`, `board_post_flags`, `expire_board_posts()` |
+
+> **Important:** Migrations must be run in order. Migration 0007 alters
+> `reddit_posts.id` from uuid to text and adds the `salary_records.region`
+> column — without these, the Reddit ingest pipeline and region stats will
+> silently fail. Migration 0008 adds the jobs board and membership tables.
 
 ### 2.3 Seed the Database
 
@@ -184,8 +197,10 @@ Set in Vercel → Settings → Environment Variables:
 | `SUPABASE_SERVICE_ROLE_KEY` | `<service-role-key>` | Supabase → Settings → API |
 
 > **Never** set `REDDIT_*` or `EMBEDDINGS_*` on Vercel — those belong on the
-> worker only. The web app should never make Reddit/embedding API calls
-> directly.
+> worker only. The web app enqueues jobs (e.g. `reddit_fetch` when the stored
+> sentiment corpus is thin) but does not make Reddit or embedding API calls
+> directly. The service-role key on Vercel is needed for enqueueing and for
+> server-side reads that bypass RLS (school directory, FX rates, etc.).
 
 ### 3.3 Deploy
 
@@ -197,9 +212,12 @@ vercel --prod
 
 - Visit the deployed URL
 - Paste a tes.com job link → should route to school report
-- School report should show TANE panel, tax regime card, website health checker
+- School report should show TANE panel, tax regime card, sentiment panel with theme clusters
 - Sign in (email magic link) → should create a profile row automatically
 - Submit a salary → should appear as pending
+- Compare page: search and add schools to the comparison tray
+- Jobs board (`/board`): browse posts; sign in to post
+- Account page (`/account`): edit profile, see reputation
 
 ---
 
@@ -222,7 +240,7 @@ vercel --prod
 | `SUPABASE_SERVICE_ROLE_KEY` | `<service-role-key>` |
 | `REDDIT_CLIENT_ID` | Reddit app client ID |
 | `REDDIT_CLIENT_SECRET` | Reddit app secret |
-| `EMBEDDINGS_API_KEY` | OpenAI API key (optional — hash fallback exists) |
+| `EMBEDDINGS_API_KEY` | OpenAI API key (required for semantic clustering — without it, embed/cluster jobs skip) |
 | `EMBEDDINGS_MODEL` | `text-embedding-3-small` (default) |
 | `WORKER_POLL_MS` | `5000` (optional, default 5s) |
 
@@ -269,17 +287,22 @@ Check Railway logs after deploy:
 ## Phase 5: Post-Deploy Checklist
 
 - [ ] Web app loads on Vercel URL
-- [ ] School report renders with TANE, tax, sentiment panels
+- [ ] School report renders with TANE, tax, sentiment panels (theme clusters + turnover)
 - [ ] Email magic link sign-in works
 - [ ] Google OAuth sign-in works
 - [ ] Salary submission → pending → moderator approve → reputation awarded
 - [ ] Currency picker converts all displays
 - [ ] Website health checker fetches a real school site
+- [ ] Compare page: school cards render, tray persists across pages
+- [ ] Jobs board (`/board`): browse works, signed-in users can post
+- [ ] Account page (`/account`): profile editing, school affiliation
 - [ ] Worker logs show queue draining (check Railway)
 - [ ] `bun db:parity` passed before cutover
 - [ ] Reddit posts appearing in `reddit_posts` table (check Supabase)
 - [ ] FX rates populated in `fx_rates` table
 - [ ] Open bounties auto-created by gap detection job
+- [ ] Board post auto-expiry runs via daily cron
+- [ ] Worker table pruning runs via daily cron (old jobs cleaned up)
 
 ---
 
@@ -307,7 +330,7 @@ REDDIT_CLIENT_ID=<app-client-id>
 REDDIT_CLIENT_SECRET=<app-secret>
 REDDIT_SUBREDDITS=InternationalTeachers,InternationalSchools,TEFL
 
-# Embeddings (optional — hash fallback exists)
+# Embeddings (required for semantic clustering — without it, jobs skip)
 EMBEDDINGS_API_KEY=<openai-key>
 EMBEDDINGS_BASE_URL=https://api.openai.com/v1
 EMBEDDINGS_MODEL=text-embedding-3-small
@@ -338,19 +361,22 @@ EMBEDDINGS_API_KEY=
 
 | Table | Purpose | RLS |
 |-------|---------|-----|
-| `profiles` | User settings (currency, household, reputation) | Self read/update |
-| `schools` | 551 schools derived from salary records | Public read |
-| `salary_records` | Salary + package data (seed + user-submitted) | Approved: public; Pending: owner/mod |
+| `profiles` | User settings (currency, household, reputation, membership kind, school affiliation) | Self read/update/insert; public read if `public_profile` |
+| `schools` | Schools derived from salary records + community submissions | Public read |
+| `salary_records` | Salary + package data (seed + user-submitted). Has `region` column (added in 0007) | Approved: public; Pending: owner/mod only. Self-insert locked to `status='pending'` |
 | `tane_components` | Per-record TANE breakdown (base/housing/flights/fees/etc.) | Via parent record |
-| `col_items` | Cost-of-living data per city | Public read |
-| `country_tax_rates` | 90+ countries: effective rate, social insurance, regime | Public read |
+| `col_items` | Cost-of-living data per city. Has `status` column (added in 0007) | Approved: public; Pending: owner/mod only |
+| `country_tax_rates` | 90+ countries: effective rate, social insurance, regime | Public read (no public write) |
 | `fx_rates` | 90+ currencies: rate_to_usd | Public read |
-| `reddit_posts` | Reddit posts with pgvector embeddings (1536-dim) | Public read |
+| `reddit_posts` | Reddit posts with pgvector embeddings (1536-dim). `id` is text (Reddit ids) | Public read |
 | `theme_clusters` | Semantic theme clusters per school + time window | Public read |
 | `job_postings` | Scraped job listings for turnover monitoring | Public read |
-| `turnover_signals` | Posting-delta × sentiment-shift correlation | Public read |
+| `turnover_signals` | Posting-delta x sentiment-shift correlation | Public read |
 | `bounties` | Reputation-based data-gap bounties | Public read; Mod write |
-| `jobs` | Queue table (drained by Railway worker) | Service-role only |
+| `jobs` | Queue table (drained by Railway worker) | Service-role only (RPC revoked from anon) |
+| `school_members` | School representative affiliations (verified by moderators) | Self insert/read/delete; verified: public; mod write |
+| `board_posts` | Community jobs board posts | Active + not expired: public; self read/update; mod write |
+| `board_post_flags` | Community moderation flags | Self insert; self/mod read |
 
 ### Reference tables
 
@@ -358,6 +384,17 @@ EMBEDDINGS_API_KEY=
 |-------|---------|
 | `market_rents` | Per-city market rent by bedroom count (TANE housing valuation) |
 | `school_fee_tiers` | Per-school annual fees by grade tier (TANE fee valuation) |
+| `posting_baselines` | Per-school posting-frequency baselines (turnover monitoring). Unique on `(school_id, window)` |
+
+### Key schema notes (migration 0007+)
+
+- `reddit_posts.id` is `text`, not `uuid` (Reddit post ids are strings like `abc123`).
+- `salary_records` has a `region` column populated from the linked school's region.
+- `salary_records.school_id` uses `ON DELETE RESTRICT` (not cascade) — use the `merge_schools(keep, remove)` RPC to deduplicate schools safely.
+- `col_items` has a `status` column (`pending` / `approved` / `rejected`) with the same moderation flow as salary records.
+- `profiles` has `profile_kind` (teacher / school_staff / recruiter), `school_id`, `bio`, and `public_profile` columns.
+- `posting_baselines` has a unique constraint on `(school_id, window)` to support upserts.
+- Worker RPCs (`claim_next_job`, `set_post_embedding`, `increment_reputation`, `merge_schools`, `prune_worker_tables`, `expire_board_posts`) are `service_role` only.
 
 ---
 
@@ -367,6 +404,50 @@ EMBEDDINGS_API_KEY=
 
 ```sql
 update profiles set role = 'moderator' where id = '<user-uuid>';
+```
+
+### Verifying a school representative
+
+A user joins a school via the Account page (`/account`), which creates an
+unverified `school_members` row. A moderator verifies them:
+
+```sql
+update school_members set verified = true where user_id = '<user-uuid>';
+```
+
+### Merging duplicate schools
+
+Schools are auto-created by the fuzzy resolver, so duplicates are inevitable.
+Use the `merge_schools()` RPC to safely repoint all child records and delete
+the duplicate (never `DELETE FROM schools` directly, as `salary_records` uses
+`ON DELETE RESTRICT`):
+
+```sql
+select merge_schools('<keep-uuid>', '<remove-uuid>');
+```
+
+This repoints `salary_records`, `job_postings`, `reddit_posts`, `bounties`,
+and `school_fee_tiers`, then cleans up baselines/clusters/signals and removes
+the duplicate school row.
+
+### Pruning old worker data
+
+The daily cron calls `prune_worker_tables()` automatically, but you can run it
+manually:
+
+```sql
+select prune_worker_tables();
+-- Deletes jobs older than 14 days (done/dead)
+-- Deletes theme_clusters and turnover_signals older than 180 days
+```
+
+### Expiring stale board posts
+
+The daily cron calls `expire_board_posts()` automatically. Manual run:
+
+```sql
+select expire_board_posts();
+-- Sets status='expired' where expires_at <= now()
 ```
 
 ### Refreshing the FX rates manually
@@ -432,13 +513,47 @@ ran (`bun db:seed`) and the school has records.
 
 ### Reddit sentiment always falls back to static
 
-1. Verify `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` on the worker
-2. Check Reddit app is set to type "script"
-3. Look for 429 (rate limit) errors in worker logs
-4. Test credentials: `curl -X POST https://www.reddit.com/api/v1/access_token ...`
+The sentiment system is now DB-first: it reads from stored `reddit_posts` +
+`theme_clusters` + `turnover_signals`, and only hits the live Reddit API when
+the stored corpus is thin. If sentiment always falls back:
 
-### Embeddings using hash fallback (not semantic)
+1. Verify `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` on the **worker** (the
+   web app does not make Reddit API calls directly, but it enqueues
+   `reddit_fetch` jobs that the worker processes)
+2. Check the `jobs` table for `reddit_fetch` jobs — are they being claimed and
+   completed by the worker?
+3. Check `reddit_posts` table: `select count(*) from reddit_posts;` — if zero,
+   the worker hasn't ingested anything yet
+4. Check Reddit app is set to type "script"
+5. Look for 429 (rate limit) errors in worker logs
+6. The web app's sentiment API also enqueues a per-school fetch job when the
+   stored corpus is thin — check for errors in those jobs
 
-Means `EMBEDDINGS_API_KEY` is missing or calls are failing. The hash fallback
-produces non-semantic vectors — clustering will still work but with lower
-quality. Check worker logs for `[embeddings] provider failed` messages.
+### Embeddings not producing semantic clusters
+
+There is no longer a hash fallback. Without `EMBEDDINGS_API_KEY`, the embed
+and cluster jobs skip entirely (posts stay unembedded, no theme clusters are
+written). This is by design to prevent non-semantic vectors from polluting
+the corpus.
+
+1. Verify `EMBEDDINGS_API_KEY` is set on the **worker** (not on Vercel)
+2. Check worker logs for `[embeddings] no provider configured` messages
+3. If the key is set but calls fail, check for API errors in worker logs
+4. Once the key is working, enqueue an embed job: `bun run worker/cron.ts daily`
+5. Verify vectors are being written: `select count(*) from reddit_posts where embedding is not null;`
+
+### Jobs board posts not appearing
+
+1. Check that migration 0008 ran (the `board_posts` table must exist)
+2. Verify the poster is signed in (posts require auth)
+3. Check if the post was auto-expired: `select status, expires_at from board_posts order by created_at desc limit 5;`
+4. Check if the post was flagged and removed: `select * from board_post_flags order by created_at desc limit 10;`
+5. Posts expire after 60 days automatically via the daily cron
+
+### Comparison tray not persisting
+
+The compare tray uses `localStorage` (key: `si.compare-tray`). If it is not
+persisting:
+1. Check browser localStorage is not disabled (private mode, etc.)
+2. The tray is limited to 3 schools max
+3. Clearing browser data resets the tray
