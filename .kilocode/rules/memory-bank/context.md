@@ -114,8 +114,34 @@ src/components/             AuthProvider, AuthButton, CurrencyProvider, TanePane
 - lint: exit 0
 - tests: 65 pass, 0 fail
 
+## 2026-07-17 Session — Sentiment self-sufficiency + embeddings clarification
+
+### Problem context
+The Reddit API workaround (committed prior) seeds 30 posts via `0009_reddit_posts_seed.sql` and uses RedReader's public `installed_client` flow so no developer key is needed. BUT the sentiment UI's "what teachers talk about" theme chips read `theme_clusters`, which were ONLY produced by the worker's semantic clustering job (requires `EMBEDDINGS_API_KEY` + always-on Railway worker). Out of the box, `theme_clusters` stayed empty and the seeded posts' lexicon themes were invisible. `.env.example` was also missing (referenced in docs).
+
+### Changes
+- **`src/lib/ai/clustering.ts`** — two-tier clustering:
+  - Semantic mode (preferred): unchanged nearest-centroid over pgvector, when provider configured.
+  - **Lexicon fallback**: when no provider (or a post has no vector), bucket by the post's existing `themes` array. So `theme_clusters` populate from the seed with ZERO external deps.
+  - Hybrid per-post: vector present → semantic; else lexicon tags. Nothing wasted.
+  - `canonicalTheme()` maps lexicon labels to the semantic vocabulary (`Salary`→`Pay`, `Leadership`→`Management`) so both modes emit consistent buckets.
+  - `runClustering()` is now idempotent: deletes prior window rows before insert (table no longer bloats on re-runs).
+  - Extracted pure `bucketByThemes()` + exported `ClusterPost` type for testing.
+- **`supabase/migrations/0010_theme_clusters_seed.sql`** — materializes `theme_clusters` straight from the seeded `reddit_posts.themes` via SQL (`unnest` + `CASE` mirroring `canonicalTheme`). Idempotent. Sentiment themes now work on first deploy with no worker and no API key. Worker upgrades these to semantic clusters once it runs.
+- **`.env.example`** (recreated) — documents the full env contract: Supabase (optional, TSV fallback), optional Reddit override, `EMBEDDINGS_*` (optional; lexicon fallback when unset), worker poll.
+- **`scripts/embed-posts.ts`** + `bun embed:posts` — one-shot backfill loop so vectors populate immediately after adding an OpenAI key (no waiting for the daily cron/worker).
+- **`tests/clustering.test.ts`** — covers `canonicalTheme` mapping + `bucketByThemes` lexicon/semantic/hybrid behavior (7 tests).
+
+### Validation
+- typecheck: exit 0
+- lint: exit 0
+- tests: 72 pass, 0 fail (was 65)
+
+### Embeddings contract (now documented)
+Two tiers: lexicon (free, instant, from seed) → semantic (opt-in upgrade via `EMBEDDINGS_API_KEY` on the worker). pgvector schema (`vector(1536)` + HNSW) and `set_post_embedding` RPC were already in place from `0001`/`0003`; nothing schema-side changed.
+
 ## Pending / Next
-- Deploy: run migrations 0001–0008 in order, `bun db:seed`, `bun db:parity`, deploy worker with REDDIT_*/EMBEDDINGS_* creds.
+- Deploy: run migrations 0001–0010 in order, `bun db:seed` (REQUIRED before 0009/0010 resolve school slugs), `bun db:parity`. Optionally `bun embed:posts` once `EMBEDDINGS_API_KEY` is set.
 - Moderation queue UI (logic exists in `submissions.ts`; needs a `/moderate` page).
 - Add CI/CD pipeline (GitHub Actions: lint + test + typecheck).
 - Contract clause analyzer (Tier 3.1 in ROADMAP.md).
