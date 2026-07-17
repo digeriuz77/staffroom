@@ -9,7 +9,7 @@
 --  4. col_items had no moderation status at all.
 --  5. reddit_posts.id was uuid but Reddit ids are text ("reddit_abc123") —
 --     every ingest insert failed, so the whole social pipeline was dead.
---  6. posting_baselines upsert targets (school_id, window) with no unique
+--  6. posting_baselines upsert targets (school_id, window_key) with no unique
 --     constraint — every upsert errored.
 --  7. salary_records had no region column but the app filters on it.
 --  8. schools -> salary_records cascade could silently destroy crowd data on
@@ -111,9 +111,9 @@ create index if not exists reddit_unembedded_idx
 -- 7. POSTING BASELINES: unique target for the upsert
 -- ===========================================================================
 delete from posting_baselines a using posting_baselines b
-  where a.school_id = b.school_id and a.window = b.window and a.id > b.id;
+  where a.school_id = b.school_id and a.window_key = b.window_key and a.id > b.id;
 create unique index if not exists posting_baselines_school_window_key
-  on posting_baselines (school_id, window);
+  on posting_baselines (school_id, window_key);
 
 -- ===========================================================================
 -- 8. SALARY RECORDS: region column (the app aggregates by region)

@@ -39,11 +39,11 @@ export async function computeBaselines(payload: TurnoverPayload): Promise<number
     const { error } = await client.from("posting_baselines").upsert(
       {
         school_id: schoolId,
-        window: "30d",
+        window_key: "30d",
         avg_posts: Math.round(avg * 100) / 100,
         computed_at: new Date().toISOString(),
       },
-      { onConflict: "school_id,window" },
+      { onConflict: "school_id,window_key" },
     );
     if (!error) written++;
   }

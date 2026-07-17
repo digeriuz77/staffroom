@@ -208,7 +208,7 @@ create index postings_source_idx on job_postings (source, first_seen_at);
 create table posting_baselines (
   id uuid primary key default gen_random_uuid(),
   school_id uuid not null references schools (id) on delete cascade,
-  window text not null,                 -- term label / bucket key
+  window_key text not null,            -- term label / bucket key
   avg_posts numeric not null default 0,
   computed_at timestamptz not null default now()
 );

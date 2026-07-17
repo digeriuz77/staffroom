@@ -193,7 +193,7 @@ export interface JobPostingRow {
 export interface PostingBaselineRow {
   id: string;
   school_id: string;
-  window: string;
+  window_key: string;
   avg_posts: number;
   computed_at: string;
 }
