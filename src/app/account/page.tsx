@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { supabaseBrowser } from "@/lib/db/supabaseClients";
 
@@ -230,6 +231,9 @@ export default function AccountPage() {
         </div>
       )}
 
+      {/* Watched Schools Section */}
+      <WatchedSchoolsList />
+
       <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
         <p className="mb-3 text-sm font-semibold text-white">Profile</p>
         <div className="space-y-3">
@@ -370,5 +374,59 @@ export default function AccountPage() {
         Sign out
       </button>
     </main>
+  );
+}
+
+function WatchedSchoolsList() {
+  const [list, setList] = useState<{ slug: string; name: string; city: string; country: string }[]>([]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("staffroom_watchlist");
+      if (stored) setList(JSON.parse(stored));
+    } catch {
+      // Ignore errors
+    }
+  }, []);
+
+  function removeWatch(slug: string) {
+    const updated = list.filter((s) => s.slug !== slug);
+    setList(updated);
+    localStorage.setItem("staffroom_watchlist", JSON.stringify(updated));
+  }
+
+  if (list.length === 0) return null;
+
+  return (
+    <div className="mt-6 rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] p-5">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-semibold text-white">⭐ My Watched Schools ({list.length})</p>
+        <span className="text-xs text-amber-300">Saved to Watchlist</span>
+      </div>
+      <div className="space-y-2">
+        {list.map((s) => (
+          <div key={s.slug} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm">
+            <div>
+              <Link href={`/school/${s.slug}`} className="font-semibold text-white hover:text-indigo-300 transition">
+                {s.name}
+              </Link>
+              <p className="text-xs text-slate-400">{s.city}, {s.country}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link href={`/school/${s.slug}`} className="text-xs text-indigo-400 hover:text-indigo-200">
+                View Report →
+              </Link>
+              <button
+                type="button"
+                onClick={() => removeWatch(s.slug)}
+                className="text-xs text-slate-500 hover:text-rose-400"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

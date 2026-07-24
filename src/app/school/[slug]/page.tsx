@@ -9,7 +9,9 @@ import { RolePreviewPanel } from "@/components/RolePreviewPanel";
 import { ProvenanceBadge, DataDisclaimer } from "@/components/ProvenanceBadge";
 import { OfferInput } from "@/components/OfferInput";
 import { CompareButton } from "@/components/CompareButton";
+import { WatchlistButton } from "@/components/WatchlistButton";
 import { ContractPackagePanel } from "@/components/ContractPackagePanel";
+import { NegotiationCopilot } from "@/components/NegotiationCopilot";
 import { ArrowIcon } from "@/components/icons";
 import { verdictTone, sentimentTone, TONE_CLASSES, pct } from "@/lib/tone";
 import { getTaxRateForCountry } from "@/lib/db/repo";
@@ -73,8 +75,9 @@ export default async function SchoolReport({ params, searchParams }: {
           {school.years.length > 0 &&
             ` · data from ${Math.min(...school.years)}–${Math.max(...school.years)}`}
         </p>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <CompareButton slug={school.slug} name={school.name} city={school.city} country={school.country} />
+          <WatchlistButton slug={school.slug} name={school.name} city={school.city} country={school.country} />
         </div>
       </header>
 
@@ -107,8 +110,9 @@ export default async function SchoolReport({ params, searchParams }: {
         </div>
       )}
       {brief && <EvidenceBrief brief={brief} />}
-
       <ContractPackagePanel records={records} />
+
+      <NegotiationCopilot schoolName={school.name} city={school.city} country={school.country} records={records} />
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-6 lg:col-span-3">
