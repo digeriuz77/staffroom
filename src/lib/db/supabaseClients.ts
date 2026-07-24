@@ -38,6 +38,8 @@ export function supabaseServer(): DbClient | null {
   return serviceClient;
 }
 
+let browserClient: DbClient | null = null;
+
 /**
  * Browser (anon) client for user-authenticated flows. Uses the public anon key.
  */
@@ -45,5 +47,8 @@ export function supabaseBrowser(): DbClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) return null;
-  return createClient(url, anon);
+  if (!browserClient) {
+    browserClient = createClient(url, anon);
+  }
+  return browserClient;
 }

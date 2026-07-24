@@ -11,9 +11,13 @@ export default function SubmitPage() {
 
   // School selection state.
   const [schoolQuery, setSchoolQuery] = useState("");
-  const [schoolResults, setSchoolResults] = useState<{ slug: string; name: string; city: string; country: string; salaryCount: number }[]>([]);
+  const [schoolResults, setSchoolResults] = useState<{ id: string; slug: string; name: string; city: string; country: string; salaryCount: number }[]>([]);
   const [selectedSchool, setSelectedSchool] = useState<{ schoolId?: string; name: string; city: string; country: string } | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customCity, setCustomCity] = useState("");
+  const [customCountry, setCustomCountry] = useState("");
 
   // Salary form state.
   const [role, setRole] = useState("");
@@ -51,6 +55,11 @@ export default function SubmitPage() {
       return;
     }
 
+    if (!selectedSchool || !selectedSchool.name.trim() || !selectedSchool.country.trim()) {
+      setError("Please select or specify a school with a valid country.");
+      return;
+    }
+
     const num = Number(salary.replace(/[^0-9.]/g, ""));
     if (!num || num < 100) {
       setError("Enter a valid salary amount.");
@@ -71,9 +80,9 @@ export default function SubmitPage() {
         },
         body: JSON.stringify({
           schoolId: selectedSchool?.schoolId,
-          schoolName: selectedSchool?.name ?? schoolQuery,
+          schoolName: selectedSchool?.name,
           city: selectedSchool?.city ?? "",
-          country: selectedSchool?.country ?? "",
+          country: selectedSchool?.country,
           role: role || "Teacher",
           managementRole: isManagement,
           year: new Date().getFullYear(),
@@ -144,15 +153,75 @@ export default function SubmitPage() {
             <div className="flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3">
               <div>
                 <p className="text-sm font-medium text-white">{selectedSchool.name}</p>
-                <p className="text-xs text-slate-400">{selectedSchool.city}, {selectedSchool.country}</p>
+                <p className="text-xs text-slate-400">{selectedSchool.city ? `${selectedSchool.city}, ` : ""}{selectedSchool.country}</p>
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedSchool(null)}
+                onClick={() => {
+                  setSelectedSchool(null);
+                  setIsAddingCustom(false);
+                }}
                 className="text-xs text-slate-400 hover:text-white"
               >
                 Change
               </button>
+            </div>
+          ) : isAddingCustom ? (
+            <div className="space-y-3 rounded-xl border border-indigo-500/30 bg-indigo-500/[0.05] p-4">
+              <p className="text-xs font-semibold text-indigo-200">Add New School Details</p>
+              <div>
+                <span className="mb-1 block text-xs text-slate-400">School Name *</span>
+                <input
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="e.g. British International School"
+                  className={inputCls}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="mb-1 block text-xs text-slate-400">City</span>
+                  <input
+                    value={customCity}
+                    onChange={(e) => setCustomCity(e.target.value)}
+                    placeholder="e.g. Dubai"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <span className="mb-1 block text-xs text-slate-400">Country *</span>
+                  <input
+                    value={customCountry}
+                    onChange={(e) => setCustomCountry(e.target.value)}
+                    placeholder="e.g. United Arab Emirates"
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingCustom(false)}
+                  className="px-3 py-1.5 text-xs text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!customName.trim() || !customCountry.trim()}
+                  onClick={() => {
+                    setSelectedSchool({
+                      name: customName.trim(),
+                      city: customCity.trim(),
+                      country: customCountry.trim(),
+                    });
+                    setIsAddingCustom(false);
+                  }}
+                  className="rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-400 disabled:opacity-50"
+                >
+                  Confirm School
+                </button>
+              </div>
             </div>
           ) : (
             <>
@@ -180,7 +249,7 @@ export default function SubmitPage() {
                       key={s.slug}
                       type="button"
                       onClick={() => {
-                        setSelectedSchool({ name: s.name, city: s.city, country: s.country });
+                        setSelectedSchool({ schoolId: s.id, name: s.name, city: s.city, country: s.country });
                         setSchoolResults([]);
                       }}
                       className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-left transition hover:border-indigo-400/30"
@@ -193,7 +262,10 @@ export default function SubmitPage() {
                   ))}
                   <button
                     type="button"
-                    onClick={() => setSelectedSchool({ name: schoolQuery, city: "", country: "" })}
+                    onClick={() => {
+                      setCustomName(schoolQuery);
+                      setIsAddingCustom(true);
+                    }}
                     className="w-full rounded-lg border border-dashed border-white/10 px-4 py-2 text-center text-xs text-slate-400 transition hover:border-indigo-400/30 hover:text-indigo-300"
                   >
                     + My school isn&apos;t listed — add &ldquo;{schoolQuery}&rdquo;
@@ -203,7 +275,10 @@ export default function SubmitPage() {
               {schoolResults.length === 0 && schoolQuery && !searchLoading && (
                 <button
                   type="button"
-                  onClick={() => setSelectedSchool({ name: schoolQuery, city: "", country: "" })}
+                  onClick={() => {
+                    setCustomName(schoolQuery);
+                    setIsAddingCustom(true);
+                  }}
                   className="mt-2 w-full rounded-lg border border-dashed border-white/10 px-4 py-2 text-center text-xs text-slate-400 transition hover:border-indigo-400/30 hover:text-indigo-300"
                 >
                   + Add &ldquo;{schoolQuery}&rdquo; as a new school
