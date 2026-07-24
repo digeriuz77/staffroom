@@ -9,6 +9,7 @@ import { RolePreviewPanel } from "@/components/RolePreviewPanel";
 import { ProvenanceBadge, DataDisclaimer } from "@/components/ProvenanceBadge";
 import { OfferInput } from "@/components/OfferInput";
 import { CompareButton } from "@/components/CompareButton";
+import { ContractPackagePanel } from "@/components/ContractPackagePanel";
 import { ArrowIcon } from "@/components/icons";
 import { verdictTone, sentimentTone, TONE_CLASSES, pct } from "@/lib/tone";
 import { getTaxRateForCountry } from "@/lib/db/repo";
@@ -105,8 +106,9 @@ export default async function SchoolReport({ params, searchParams }: {
           )}
         </div>
       )}
-
       {brief && <EvidenceBrief brief={brief} />}
+
+      <ContractPackagePanel records={records} />
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-6 lg:col-span-3">

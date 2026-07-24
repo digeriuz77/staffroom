@@ -1,8 +1,10 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { getSchools } from "@/lib/db/repo";
 import { REGION_ORDER } from "@/lib/types";
 import { formatUsd } from "@/lib/analysis/finance";
 import { netValues, statsFor } from "@/lib/analysis/finance";
+import { slugify } from "@/lib/data/schools";
 import {
   SchoolDirectory,
   type SchoolDirectoryEntry,
@@ -41,6 +43,33 @@ export default async function SchoolsPage() {
         <p className="mt-2 text-slate-400">
           Search {all.length} schools, or choose a region without scrolling through the full directory.
         </p>
+
+        {/* Popular Destination SEO Quick Links */}
+        <div className="mt-5 flex flex-wrap items-center gap-2 text-xs">
+          <span className="font-semibold text-slate-400">Popular Destinations:</span>
+          {[
+            "Vietnam",
+            "Japan",
+            "United Arab Emirates",
+            "Qatar",
+            "China",
+            "Thailand",
+            "Singapore",
+            "Hong Kong",
+            "Spain",
+            "Italy",
+            "Germany",
+            "Saudi Arabia",
+          ].map((c) => (
+            <Link
+              key={c}
+              href={`/schools/country/${slugify(c)}`}
+              className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-slate-300 transition hover:border-indigo-400/40 hover:bg-white/[0.08] hover:text-white"
+            >
+              {c}
+            </Link>
+          ))}
+        </div>
       </header>
 
       <SchoolDirectory schools={entries} regions={activeRegions} />

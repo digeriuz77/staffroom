@@ -46,6 +46,21 @@ export default function SubmitPage() {
     QAR: 0.275, SAR: 0.267, INR: 0.012, AUD: 0.713, HKD: 0.128,
   };
 
+  const [housingAmount, setHousingAmount] = useState("");
+  const [flightAmount, setFlightAmount] = useState("");
+  const [bonusAmount, setBonusAmount] = useState("");
+  const [benefitsText, setBenefitsText] = useState("");
+
+  const numSalary = Number(salary.replace(/[^0-9.]/g, "")) || 0;
+  const usdSalary = numSalary * (fx[currency] ?? 1);
+  const monthlyUsdSalary = period === "year" ? usdSalary / 12 : usdSalary;
+  const numTax = taxRate ? Number(taxRate) / 100 : 0;
+  const netMonthlyUsdPreview = Math.round(monthlyUsdSalary * (1 - numTax));
+  const numHousing = Number(housingAmount.replace(/[^0-9.]/g, "")) || 0;
+  const numFlight = Number(flightAmount.replace(/[^0-9.]/g, "")) || 0;
+  const numBonus = Number(bonusAmount.replace(/[^0-9.]/g, "")) || 0;
+  const annualPackageEstimate = netMonthlyUsdPreview * 12 + numHousing * 12 + numFlight + numBonus;
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -91,6 +106,12 @@ export default function SubmitPage() {
           taxRate: taxRate ? Number(taxRate) / 100 : null,
           housing,
           flights,
+          package: {
+            housingAllowanceUsd: numHousing > 0 ? numHousing : undefined,
+            flightsPerPersonUsd: numFlight > 0 ? numFlight : undefined,
+            bonusUsd: numBonus > 0 ? numBonus : undefined,
+            additionalBenefits: benefitsText ? benefitsText.trim() : undefined,
+          },
           tenureYears: null,
         }),
       });
@@ -290,7 +311,7 @@ export default function SubmitPage() {
 
         {/* Step 2: Salary details */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-          <p className="mb-3 text-sm font-semibold text-white">2. Offer details</p>
+          <p className="mb-3 text-sm font-semibold text-white">2. Base Compensation</p>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Role" className="col-span-2">
               <input className={inputCls} value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Primary Teacher, Head of Maths" />
@@ -320,21 +341,62 @@ export default function SubmitPage() {
             <Field label="Salary amount" className="col-span-2">
               <input className={inputCls} value={salary} onChange={(e) => setSalary(e.target.value)} placeholder="e.g. 4500" type="number" />
             </Field>
-            <Field label="Housing">
+          </div>
+        </div>
+
+        {/* Step 3: Package breakdown */}
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+          <p className="mb-1 text-sm font-semibold text-white">3. Package Breakdown &amp; Allowances</p>
+          <p className="mb-3 text-xs text-slate-500">Provide full contract details for more accurate teacher comparisons.</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Housing Status">
               <select className={inputCls} value={housing} onChange={(e) => setHousing(e.target.value as "None" | "Allowance" | "Provided")}>
                 <option value="None" className="bg-[#0c0f17]">None</option>
                 <option value="Allowance" className="bg-[#0c0f17]">Allowance</option>
-                <option value="Provided" className="bg-[#0c0f17]">Provided</option>
+                <option value="Provided" className="bg-[#0c0f17]">Provided Housing</option>
               </select>
             </Field>
-            <Field label="Flights included?">
+            {housing === "Allowance" && (
+              <Field label="Housing Allowance (USD/mo)">
+                <input className={inputCls} value={housingAmount} onChange={(e) => setHousingAmount(e.target.value)} placeholder="e.g. 1200" type="number" />
+              </Field>
+            )}
+            <Field label="Flights Included?">
               <select className={inputCls} value={String(flights)} onChange={(e) => setFlights(e.target.value === "true")}>
                 <option value="true" className="bg-[#0c0f17]">Yes</option>
                 <option value="false" className="bg-[#0c0f17]">No</option>
               </select>
             </Field>
+            {flights && (
+              <Field label="Flight Allowance (USD/yr)">
+                <input className={inputCls} value={flightAmount} onChange={(e) => setFlightAmount(e.target.value)} placeholder="e.g. 1500" type="number" />
+              </Field>
+            )}
+            <Field label="End-of-Contract Bonus (USD)" className="col-span-2">
+              <input className={inputCls} value={bonusAmount} onChange={(e) => setBonusAmount(e.target.value)} placeholder="e.g. 3000 (annual bonus or exit gratuity)" type="number" />
+            </Field>
+            <Field label="Additional Benefits Notes" className="col-span-2">
+              <textarea className={`${inputCls} min-h-[70px]`} value={benefitsText} onChange={(e) => setBenefitsText(e.target.value)} placeholder="e.g. 100% tuition for 2 children, global health insurance, moving allowance" />
+            </Field>
           </div>
         </div>
+
+        {/* Real-time Package Live Preview */}
+        {monthlyUsdSalary > 0 && (
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.05] p-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">Live Package Estimate</p>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xl font-bold text-white">${netMonthlyUsdPreview.toLocaleString()}/mo net</p>
+                <p className="text-xs text-slate-400">Monthly take-home salary after estimated tax</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xl font-bold text-emerald-300">${annualPackageEstimate.toLocaleString()}/yr</p>
+                <p className="text-xs text-slate-400">Total estimated annual package</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <button
           type="submit"
