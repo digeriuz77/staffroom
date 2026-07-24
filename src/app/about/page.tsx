@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { getSchools, getColItems } from "@/lib/db/repo";
 
 export const metadata: Metadata = {
@@ -67,19 +68,61 @@ export default async function AboutPage() {
           flagging feeds moderation. Think of it as Dave&apos;s ESL Cafe, rebuilt for international schools.
         </p>
 
-        <h2 className="text-lg font-semibold text-white">Contributing</h2>
-        <p>
-          The dataset grows more valuable as more teachers contribute. <Link href="/submit" className="text-indigo-300 hover:text-indigo-200">Submit a salary record</Link>
-          {" "}to earn reputation points, or claim a <Link href="/bounties" className="text-indigo-300 hover:text-indigo-200">bounty</Link> for
-          schools with thin or stale data. Your submissions are moderated and your identity is never revealed.
-        </p>
+        {/* Creator & Support Section */}
+        <section className="mt-8 rounded-2xl border border-amber-400/30 bg-amber-500/[0.05] p-6 backdrop-blur-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <span className="rounded-md border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-xs font-semibold text-amber-300">
+                Project Founder
+              </span>
+              <h2 className="mt-2 text-xl font-bold text-white">Created by Gary Stanyard</h2>
+              <p className="mt-1 text-xs text-slate-300">
+                Independent project dedicated to salary transparency for international educators.
+              </p>
+            </div>
+            <a
+              href="https://www.linkedin.com/in/garystanyard/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#0A66C2] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#084e96]"
+            >
+              <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24">
+                <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 10.9v8.37H9.25V10.9H6.46M7.86 6.77a1.64 1.64 0 1 0 0 3.28 1.64 1.64 0 0 0 0-3.28Z" />
+              </svg>
+              Connect on LinkedIn
+            </a>
+          </div>
 
-        <h2 className="text-lg font-semibold text-white">Comparison</h2>
-        <p>
-          Add schools to the comparison tray from any school report or the compare page. Compare up to 3 schools
-          side-by-side: median salaries, tax regimes, cost of living, buying power, and sentiment. The tray
-          persists in your browser so you can build your shortlist across visits.
-        </p>
+          <div className="mt-6 grid items-center gap-6 rounded-xl border border-white/10 bg-white/[0.03] p-4 sm:grid-cols-2">
+            <div>
+              <h3 className="text-base font-bold text-white">Support the Project 🍺</h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                Staffroom Intel is 100% free and independent. If the salary data, purchasing power metrics, or Reddit insights helped you negotiate your teaching contract, consider buying me a beer!
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <a
+                  href="https://www.buymeacoffee.com/garystanyard"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#FFDD00] px-4 py-2 text-xs font-bold text-slate-950 transition hover:bg-[#ffe533]"
+                >
+                  <span>🍺</span> Buy me a beer on BMC
+                </a>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center justify-center rounded-xl bg-white p-3 text-center">
+              <Image
+                src="/bmc-qr.png"
+                alt="Scan to support Gary on Buy Me a Coffee"
+                width={150}
+                height={150}
+                className="h-auto w-36 rounded"
+              />
+              <p className="mt-1 text-[11px] font-semibold text-slate-900">Scan QR Code to Support</p>
+            </div>
+          </div>
+        </section>
 
         <p className="pt-4 text-xs text-slate-600">
           Salary data is indicative and self-reported. Always review your offer letter and contract.

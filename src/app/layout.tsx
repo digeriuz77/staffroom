@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { AuthProvider } from "@/components/AuthProvider";
 import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { CompareTray } from "@/components/CompareTray";
+import { BuyMeACoffee } from "@/components/BuyMeACoffee";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             {children}
             <SiteFooter />
             <CompareTray />
+            <BuyMeACoffee />
           </CurrencyProvider>
         </AuthProvider>
       </body>

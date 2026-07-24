@@ -5,6 +5,7 @@ import Link from "next/link";
 import { SparkIcon } from "@/components/icons";
 import { AuthButton } from "@/components/AuthButton";
 import { CurrencyPicker } from "@/components/CurrencyProvider";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function SiteNav() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -22,11 +23,14 @@ export function SiteNav() {
         </Link>
         <div className="hidden items-center gap-1 text-sm lg:flex">
           <NavLink href="/schools">Schools</NavLink>
+          <NavLink href="/insights">Data Insights</NavLink>
           <NavLink href="/compare">Compare</NavLink>
           <NavLink href="/board">Board</NavLink>
           <NavLink href="/purchasing-power">Purchasing Power</NavLink>
+          <NavLink href="/about">About</NavLink>
           <NavLink href="/submit">Contribute</NavLink>
           <div className="ml-2 flex items-center gap-2 border-l border-white/[0.06] pl-3">
+            <ThemeToggle />
             <CurrencyPicker />
             <AuthButton />
           </div>
@@ -50,12 +54,15 @@ export function SiteNav() {
             <div className="absolute inset-x-4 top-[calc(100%+0.5rem)] rounded-2xl border border-white/10 bg-[#0c0f17]/95 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl">
               <div className="grid gap-1 text-sm">
                 <MobileNavLink href="/schools" onNavigate={() => setMobileOpen(false)}>Schools</MobileNavLink>
+                <MobileNavLink href="/insights" onNavigate={() => setMobileOpen(false)}>Data Insights</MobileNavLink>
                 <MobileNavLink href="/compare" onNavigate={() => setMobileOpen(false)}>Compare</MobileNavLink>
                 <MobileNavLink href="/board" onNavigate={() => setMobileOpen(false)}>Board</MobileNavLink>
                 <MobileNavLink href="/purchasing-power" onNavigate={() => setMobileOpen(false)}>Purchasing Power</MobileNavLink>
+                <MobileNavLink href="/about" onNavigate={() => setMobileOpen(false)}>About</MobileNavLink>
                 <MobileNavLink href="/submit" onNavigate={() => setMobileOpen(false)}>Contribute</MobileNavLink>
               </div>
               <div className="mt-3 flex min-h-11 flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] pt-3">
+                <ThemeToggle />
                 <CurrencyPicker />
                 <AuthButton />
               </div>
