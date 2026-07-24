@@ -4,6 +4,7 @@ import { getTaxRateForCountry, getSchools } from "@/lib/db/repo";
 import { verdictTone, TONE_CLASSES } from "@/lib/tone";
 import { DataDisclaimer } from "@/components/ProvenanceBadge";
 import { CompareSchoolSearch } from "@/components/CompareSchoolSearch";
+import { ComparisonMatrix } from "@/components/ComparisonMatrix";
 import type { Metadata } from "next";
 import type { SalaryReport } from "@/lib/analysis/salary";
 import type { ColItem } from "@/lib/types";
@@ -68,20 +69,23 @@ export default async function ComparePage({
           Side-by-side salary packages, tax regimes, and cost of living. Pick up to 3 schools from the browse page or search below.
         </p>
       </header>
-
       <CompareSchoolSearch />
 
       {hasData && (
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {entries.map((e, i) => (
-            <SchoolCard
-              key={e.slug}
-              entry={e}
-              isBestMedian={i === bestMedianIdx}
-              isBestTakeHome={i === bestTakeHomeIdx}
-              isBestBuyingPower={i === bestBuyingPowerIdx}
-            />
-          ))}
+        <div className="mt-8 space-y-8">
+          <ComparisonMatrix entries={entries} />
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {entries.map((e, i) => (
+              <SchoolCard
+                key={e.slug}
+                entry={e}
+                isBestMedian={i === bestMedianIdx}
+                isBestTakeHome={i === bestTakeHomeIdx}
+                isBestBuyingPower={i === bestBuyingPowerIdx}
+              />
+            ))}
+          </div>
         </div>
       )}
 
