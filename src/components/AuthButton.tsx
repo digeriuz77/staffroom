@@ -23,6 +23,12 @@ export function AuthButton() {
     return (
       <div className="flex items-center gap-2">
         <Link
+          href="/admin"
+          className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-200 transition hover:bg-indigo-500/20"
+        >
+          Admin
+        </Link>
+        <Link
           href="/account"
           className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:text-white"
         >
