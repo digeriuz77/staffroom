@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { buildSalaryReportAsync, formatUsd } from "@/lib/analysis/salary";
-import { getTaxRateForCountry, getSchools } from "@/lib/db/repo";
-import { verdictTone, TONE_CLASSES } from "@/lib/tone";
+import { getTaxRateForCountry } from "@/lib/db/repo";
 import { DataDisclaimer } from "@/components/ProvenanceBadge";
 import { CompareSchoolSearch } from "@/components/CompareSchoolSearch";
-import { ComparisonMatrix } from "@/components/ComparisonMatrix";
+import { ComparisonBanner, ComparisonMatrix } from "@/components/ComparisonMatrix";
 import type { Metadata } from "next";
 import type { SalaryReport } from "@/lib/analysis/salary";
-import type { ColItem } from "@/lib/types";
 
 export const metadata: Metadata = {
   title: "Compare Schools — Staffroom Intel",
@@ -73,8 +71,10 @@ export default async function ComparePage({
 
       {hasData && (
         <div className="mt-8 space-y-8">
-          <ComparisonMatrix entries={entries} />
+          {/* Overall recommendation */}
+          <ComparisonBanner entries={entries} />
 
+          {/* Quick visual summary — one card per school */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {entries.map((e, i) => (
               <SchoolCard
@@ -86,6 +86,9 @@ export default async function ComparePage({
               />
             ))}
           </div>
+
+          {/* Detailed side-by-side matrix */}
+          <ComparisonMatrix entries={entries} />
         </div>
       )}
 
@@ -140,85 +143,82 @@ function SchoolCard({
   }
 
   const { school, schoolStats, countryStats, regionStats, col } = report;
+  const anyHighlight = isBestMedian || isBestTakeHome || isBestBuyingPower;
 
   return (
-    <div className="flex flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+    <div className={`flex flex-col rounded-2xl border p-5 transition ${
+      anyHighlight
+        ? "border-emerald-500/25 bg-emerald-500/[0.03]"
+        : "border-white/10 bg-white/[0.03]"
+    }`}>
       {/* Header */}
       <Link href={`/school/${entry.slug}`} className="block">
-        <h2 className="text-lg font-bold text-white transition hover:text-indigo-300">{school.name}</h2>
-        <p className="text-xs text-slate-500">{school.city}, {school.country}</p>
+        <h2 className="text-base font-bold text-white transition hover:text-indigo-300">{school.name}</h2>
+        <p className="mt-0.5 text-xs text-slate-500">{school.city}, {school.country}</p>
       </Link>
 
-      <div className="mt-1 flex flex-wrap gap-1.5">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {school.curricula.map((c) => (
           <span key={c} className="rounded-md bg-indigo-500/10 px-1.5 py-0.5 text-[10px] text-indigo-300">{c}</span>
         ))}
         <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-400">{school.region}</span>
+        <span className="ml-auto text-[10px] text-slate-600">{report.records.length} record{report.records.length !== 1 ? "s" : ""}</span>
       </div>
 
-      {/* Records */}
-      <div className="mt-4 flex items-baseline gap-2">
-        <span className="text-2xl font-bold text-white">{report.records.length}</span>
-        <span className="text-xs text-slate-500">salary records</span>
+      {/* Hero stat: school median */}
+      <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Median net salary</p>
+        <p className={`mt-0.5 text-2xl font-extrabold ${isBestMedian ? "text-emerald-300" : "text-white"}`}>
+          {formatUsd(schoolStats.median, true)}
+          <span className="text-sm font-medium text-slate-500">/mo</span>
+          {isBestMedian && <span className="ml-1.5 text-xs text-emerald-400">★ best</span>}
+        </p>
       </div>
 
-      {/* Salary stats */}
-      <div className="mt-4 space-y-2.5 border-t border-white/5 pt-4">
-        <Metric
-          label="School median (net/mo)"
-          value={formatUsd(schoolStats.median, true)}
-          highlight={isBestMedian}
+      {/* Key metrics — 2-col grid */}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <KeyMetric
+          label="Take-home"
+          value={taxRate ? `${Math.round(taxRate.takeHomePct * 100)}%` : "—"}
+          highlight={isBestTakeHome}
         />
-        <Metric label="Country median" value={formatUsd(countryStats.median, true)} />
-        <Metric label="Region median" value={formatUsd(regionStats.median, true)} />
-        <Metric
-          label="Country P25–P75"
-          value={`${formatUsd(countryStats.p25, true)} – ${formatUsd(countryStats.p75, true)}`}
+        <KeyMetric
+          label="Buying power"
+          value={col ? formatUsd(col.buyingPowerUsd, true) : "—"}
+          highlight={isBestBuyingPower}
         />
+        <KeyMetric label="Country median" value={formatUsd(countryStats.median, true)} />
+        <KeyMetric label="Region median" value={formatUsd(regionStats.median, true)} />
       </div>
 
-      {/* Tax regime */}
-      {taxRate && (
-        <div className="mt-4 space-y-2.5 border-t border-white/5 pt-4">
-          <Metric label="Tax regime" value={taxRate.taxRegime} />
-          <Metric
-            label="Take-home %"
-            value={`${Math.round(taxRate.takeHomePct * 100)}%`}
-            highlight={isBestTakeHome}
-          />
-          <p className="text-[11px] text-slate-600">
-            ~{Math.round(taxRate.effectiveRate * 100)}% effective tax
-          </p>
+      {/* Context rows */}
+      <div className="mt-3 space-y-1.5 border-t border-white/5 pt-3 text-xs">
+        <div className="flex items-center justify-between">
+          <span className="text-slate-500">Middle 50% range</span>
+          <span className="font-medium text-slate-300">
+            {formatUsd(countryStats.p25, true)} – {formatUsd(countryStats.p75, true)}
+          </span>
         </div>
-      )}
-
-      {/* Cost of living */}
-      {col && (
-        <div className="mt-4 space-y-2.5 border-t border-white/5 pt-4">
-          <Metric label="COL index" value={`${col.colIndex} (London=100)`} />
-          <Metric
-            label="Buying power (net/mo)"
-            value={formatUsd(col.buyingPowerUsd, true)}
-            highlight={isBestBuyingPower}
-          />
-          <div className="grid grid-cols-3 gap-2 pt-1">
-            <MiniMetric label="Beer" value={`$${col.beer.toFixed(0)}`} />
-            <MiniMetric label="Gym/mo" value={`$${col.gym.toFixed(0)}`} />
-            <MiniMetric label="Meal" value={`$${col.meal.toFixed(0)}`} />
+        {taxRate && (
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500">Tax regime</span>
+            <span className="font-medium text-slate-300">{taxRate.taxRegime}</span>
           </div>
-        </div>
-      )}
+        )}
+        {col && (
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500">COL index</span>
+            <span className="font-medium text-slate-300">{col.colIndex} <span className="text-slate-600">(London=100)</span></span>
+          </div>
+        )}
+      </div>
 
-      {/* Offer verdict */}
-      {report.offer && (
-        <div className="mt-4 border-t border-white/5 pt-4">
-          <p className="text-xs text-slate-500">Offer verdict</p>
-          <p className={`text-base font-bold ${TONE_CLASSES[verdictTone(report.offer.verdict)].text}`}>
-            {report.offer.verdict}
-          </p>
-          <p className="mt-0.5 text-xs text-slate-500">
-            {formatUsd(report.offer.offeredMonthlyUsd)}/mo · {Math.round(report.offer.percentileVsCountry)}%ile
-          </p>
+      {/* COL price snapshot */}
+      {col && (
+        <div className="mt-3 grid grid-cols-3 gap-1.5 border-t border-white/5 pt-3">
+          <MiniMetric label="Beer" value={`$${col.beer.toFixed(0)}`} />
+          <MiniMetric label="Gym/mo" value={`$${col.gym.toFixed(0)}`} />
+          <MiniMetric label="Meal" value={`$${col.meal.toFixed(0)}`} />
         </div>
       )}
 
@@ -234,14 +234,18 @@ function SchoolCard({
   );
 }
 
-function Metric({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function KeyMetric({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-xs text-slate-500">{label}</span>
-      <span className={`text-sm font-semibold ${highlight ? "text-emerald-300" : "text-slate-200"}`}>
+    <div className={`rounded-lg border px-3 py-2 ${
+      highlight
+        ? "border-emerald-500/25 bg-emerald-500/[0.06]"
+        : "border-white/5 bg-white/[0.02]"
+    }`}>
+      <p className="text-[10px] text-slate-500">{label}</p>
+      <p className={`mt-0.5 text-sm font-bold ${highlight ? "text-emerald-300" : "text-white"}`}>
         {value}
-        {highlight && <span className="ml-1 text-[10px] text-emerald-400/60">★</span>}
-      </span>
+        {highlight && <span className="ml-1 text-[9px] text-emerald-400/70">★</span>}
+      </p>
     </div>
   );
 }
