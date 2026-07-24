@@ -64,7 +64,7 @@ export async function fetchAndStoreReddit(payload: FetchPayload): Promise<number
     const dir = await loadSchoolDir();
     let total = 0;
     for (const sub of redditSubreddits()) {
-      const result = await fetchSubredditNew(sub, 25);
+      const result = await fetchSubredditNew(sub, 100);
       if (result.posts.length === 0) continue;
       total += await storeSweepPosts(client, result.posts, sub, dir);
     }

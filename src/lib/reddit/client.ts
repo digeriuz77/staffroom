@@ -154,11 +154,12 @@ function toSentimentPost(link: RedditLink): SentimentPost {
 function buildQueries(schoolName: string): string[] {
   const core = schoolName.trim();
   const short = core.replace(/(international school|school|college|academy|institute)/gi, "").trim() || core;
-  return [
-    `"${core}" review`,
-    `${core} teacher experience`,
-    `${short} school reddit`,
-  ];
+  const distinctive = short.split(" ").filter((w) => w.length > 3)[0] || short;
+  const queries = [core, short];
+  if (distinctive && distinctive !== core && distinctive !== short) {
+    queries.push(distinctive);
+  }
+  return queries;
 }
 
 const GENERIC_SCHOOL_WORDS = new Set([
