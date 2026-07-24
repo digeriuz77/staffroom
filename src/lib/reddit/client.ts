@@ -190,7 +190,7 @@ export function isRelevantSchoolMention(
   const distinctive = school
     .split(" ")
     .filter((token) => token.length > 2 && !GENERIC_SCHOOL_WORDS.has(token));
-  if (distinctive.length < 2) return false;
+  if (distinctive.length === 0) return false;
   return distinctive.every((token) => text.includes(token));
 }
 
@@ -256,7 +256,7 @@ export async function searchSchoolOnReddit(schoolName: string, limit = 8): Promi
       sort: "relevance",
       type: "link",
       restrict_sr: "false",
-      t: "year",
+      t: "all",
     });
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
