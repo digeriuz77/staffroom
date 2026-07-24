@@ -453,6 +453,19 @@ const ACCREDITATION: PlatformEntry[] = [
 // ---------------------------------------------------------------------------
 const SOCIAL_REDDIT: PlatformEntry[] = [
   {
+    key: "reddit_intschoolreview",
+    label: "r/intschoolreview",
+    url: "https://www.reddit.com/r/intschoolreview/",
+    category: "social",
+    dataType: ["review", "salary", "forum"],
+    searchUrl: (n) => `https://www.reddit.com/r/intschoolreview/search/?q=${encodeURIComponent(n)}`,
+    scrapeFeasibility: "high",
+    access: "free",
+    region: "global",
+    priority: 5,
+    notes: "Dedicated international school review subreddit.",
+  },
+  {
     key: "reddit_intlteachers",
     label: "r/InternationalTeachers",
     url: "https://www.reddit.com/r/InternationalTeachers/",

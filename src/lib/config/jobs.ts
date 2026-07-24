@@ -18,6 +18,7 @@ export function redditSubreddits(): string[] {
   const raw = process.env.REDDIT_SUBREDDITS;
   if (!raw)
     return [
+      "intschoolreview",
       "InternationalTeachers",
       "InternationalSchools",
       "TEFL",
