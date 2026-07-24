@@ -12,6 +12,7 @@ import { CompareButton } from "@/components/CompareButton";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { ContractPackagePanel } from "@/components/ContractPackagePanel";
 import { NegotiationCopilot } from "@/components/NegotiationCopilot";
+import { GoogleAdSlot } from "@/components/GoogleAdSlot";
 import { ArrowIcon } from "@/components/icons";
 import { verdictTone, sentimentTone, TONE_CLASSES, pct } from "@/lib/tone";
 import { getTaxRateForCountry } from "@/lib/db/repo";
@@ -113,6 +114,7 @@ export default async function SchoolReport({ params, searchParams }: {
       <ContractPackagePanel records={records} />
 
       <NegotiationCopilot schoolName={school.name} city={school.city} country={school.country} records={records} />
+      <GoogleAdSlot className="my-6" />
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-6 lg:col-span-3">
