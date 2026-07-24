@@ -43,11 +43,14 @@ function parseRow(line: string, idx: number): SalaryRecord | null {
   const cols = line.split("\t");
   if (cols.length < 9) return null;
   const [yearStr, country, city, school, curriculum, role, salaryStr, housingStr, flightsStr, taxStr] = cols;
-  const monthlySalaryUsd = parseMoney(salaryStr ?? "0");
+  let monthlySalaryUsd = parseMoney(salaryStr ?? "0");
   if (!monthlySalaryUsd) return null;
+  if (monthlySalaryUsd > 15000) {
+    monthlySalaryUsd = Math.round(monthlySalaryUsd / 12);
+  }
   const taxRate = parseTax(taxStr ?? "");
   const flights = (flightsStr ?? "").trim().toLowerCase().startsWith("y");
-  const netMonthlyUsd = taxRate != null ? monthlySalaryUsd * (1 - taxRate) : monthlySalaryUsd;
+  const netMonthlyUsd = taxRate != null ? Math.round(monthlySalaryUsd * (1 - taxRate)) : monthlySalaryUsd;
   return {
     id: `r${idx}`,
     year: Number(yearStr) || new Date().getFullYear(),
