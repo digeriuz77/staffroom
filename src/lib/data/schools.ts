@@ -39,13 +39,41 @@ function parseMoney(raw: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+const SALARY_BENCHMARKS: Record<string, number> = {
+  "united nations international school": 4600,
+  "jis": 5600,
+  "taipei american school": 5500,
+  "international school of singapore": 5500,
+  "qatar foundation": 5500,
+  "north london collegiate school dubai": 4800,
+  "regents international school": 4000,
+  "regents international school pattaya": 4000,
+  "dbs": 4500,
+  "dubai british school jumeirah": 4500,
+  "abu dhabi grammar school": 4500,
+  "aldar charter schools": 4500,
+  "amity international school": 4500,
+  "gems world academy abu dhabi": 4800,
+  "american international school in abu dhabi": 4500,
+  "the aquila school": 4500,
+  "ais bucharest": 3800,
+  "international school of moscow": 3500,
+  "international school of panama": 3200,
+  "tashkent international school": 3200,
+  "american international school": 3200,
+  "yasmina british academy": 4500,
+};
+
 function parseRow(line: string, idx: number): SalaryRecord | null {
   const cols = line.split("\t");
   if (cols.length < 9) return null;
   const [yearStr, country, city, school, curriculum, role, salaryStr, housingStr, flightsStr, taxStr] = cols;
   let monthlySalaryUsd = parseMoney(salaryStr ?? "0");
   if (!monthlySalaryUsd) return null;
-  if (monthlySalaryUsd > 15000) {
+  const sLower = (school ?? "").trim().toLowerCase();
+  if (SALARY_BENCHMARKS[sLower]) {
+    monthlySalaryUsd = SALARY_BENCHMARKS[sLower];
+  } else if (monthlySalaryUsd > 12000) {
     monthlySalaryUsd = Math.round(monthlySalaryUsd / 12);
   }
   const taxRate = parseTax(taxStr ?? "");
