@@ -62,15 +62,22 @@ export default async function Home({
       </section>
 
       <section className="mx-auto max-w-4xl px-4 pb-24">
-        <div className="glass rounded-2xl p-5 sm:p-6">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-white">Explore Staffroom Intel</h2>
-            <p className="mt-1 text-sm text-slate-400">Start with the route that matches your next decision.</p>
+        <div className="glass rounded-2xl p-5 sm:p-6 shadow-xl">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-white">App Features</h2>
+              <p className="text-xs text-slate-400">Direct tools to evaluate packages &amp; negotiate contracts</p>
+            </div>
+            <span className="rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-300">
+              Live Intel
+            </span>
           </div>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <SupportingLink href="/compare" title="Compare schools" detail="Packages side by side" />
-            <SupportingLink href="/board" title="Browse jobs" detail="Community vacancies" />
-            <SupportingLink href="/submit" title="Contribute data" detail="Improve the evidence" />
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <AppCardLink href="/schools" icon="🏫" title="Browse Schools" detail="673 Verified Profiles" badge="Verified" />
+            <AppCardLink href="/insights" icon="📊" title="Data Insights" detail="Global Pay &amp; CoL Metrics" badge="New" />
+            <AppCardLink href="/compare" icon="⚖️" title="Compare Packages" detail="Side-by-Side Analysis" badge="Compare" />
+            <AppCardLink href="/purchasing-power" icon="🧮" title="Savings Calculator" detail="Household Budgeting" badge="Interactive" />
           </div>
         </div>
       </section>
@@ -78,27 +85,42 @@ export default async function Home({
   );
 }
 
-function SupportingLink({
+function AppCardLink({
   href,
+  icon,
   title,
   detail,
+  badge,
 }: {
   href: string;
+  icon: string;
   title: string;
   detail: string;
+  badge: string;
 }) {
   return (
     <Link
       href={href}
-      className="group flex min-h-16 items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left transition hover:border-indigo-400/30 hover:bg-white/[0.06]"
+      className="group flex flex-col justify-between rounded-xl border border-white/10 bg-white/[0.03] p-4 transition active:scale-[0.98] hover:border-indigo-400/40 hover:bg-white/[0.07] shadow-sm"
     >
-      <span>
-        <span className="block text-sm font-medium text-white">{title}</span>
-        <span className="mt-0.5 block text-xs text-slate-500">{detail}</span>
-      </span>
-      <span className="text-slate-600 transition group-hover:translate-x-0.5 group-hover:text-indigo-300" aria-hidden="true">
-        →
-      </span>
+      <div className="flex items-center justify-between">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-lg border border-white/10 group-hover:border-indigo-500/30 group-hover:bg-indigo-500/10 transition">
+          {icon}
+        </span>
+        <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
+          {badge}
+        </span>
+      </div>
+
+      <div className="mt-4 flex items-end justify-between">
+        <div>
+          <p className="text-sm font-bold text-white group-hover:text-indigo-300 transition">{title}</p>
+          <p className="mt-0.5 text-xs text-slate-400">{detail}</p>
+        </div>
+        <span className="text-base font-bold text-slate-500 group-hover:translate-x-0.5 group-hover:text-indigo-300 transition">
+          ›
+        </span>
+      </div>
     </Link>
   );
 }

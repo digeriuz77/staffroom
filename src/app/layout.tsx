@@ -7,6 +7,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { CompareTray } from "@/components/CompareTray";
 import { BuyMeACoffee } from "@/components/BuyMeACoffee";
+import { BottomTabBar } from "@/components/BottomTabBar";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased pb-20 md:pb-0`}>
         <AuthProvider>
           <CurrencyProvider>
             <SiteNav />
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <SiteFooter />
             <CompareTray />
             <BuyMeACoffee />
+            <BottomTabBar />
           </CurrencyProvider>
         </AuthProvider>
       </body>

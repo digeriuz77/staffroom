@@ -133,22 +133,32 @@ export function SchoolDirectory({
             <Link
               key={school.id}
               href={`/school/${school.slug}`}
-              className="group flex min-w-0 items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 transition hover:border-indigo-400/30 hover:bg-white/[0.06]"
+              className="group flex min-w-0 items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3.5 transition active:scale-[0.99] hover:border-indigo-400/40 hover:bg-white/[0.07] shadow-sm"
             >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-white group-hover:text-indigo-300">
-                  {school.name}
-                </p>
-                <p className="truncate text-xs text-slate-500">
-                  {school.city}, {school.country} · {school.recordCount} record
-                  {school.recordCount !== 1 ? "s" : ""}
-                </p>
-              </div>
-              {school.medianLabel && (
-                <span className="ml-3 shrink-0 text-sm font-semibold text-white">
-                  {school.medianLabel}/mo
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/5 text-base border border-white/10 group-hover:border-indigo-500/30 group-hover:bg-indigo-500/10">
+                  🏫
                 </span>
-              )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white group-hover:text-indigo-300 transition">
+                    {school.name}
+                  </p>
+                  <p className="truncate text-xs text-slate-400">
+                    {school.city}, {school.country} · <span className="text-slate-500">{school.recordCount} rec{school.recordCount !== 1 ? "s" : ""}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="ml-3 flex shrink-0 items-center gap-2">
+                {school.medianLabel && (
+                  <span className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-xs font-bold text-emerald-300">
+                    {school.medianLabel}/mo
+                  </span>
+                )}
+                <span className="text-sm font-bold text-slate-500 group-hover:translate-x-0.5 group-hover:text-indigo-300 transition">
+                  ›
+                </span>
+              </div>
             </Link>
           ))}
         </div>
