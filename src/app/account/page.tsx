@@ -69,6 +69,9 @@ export default function AccountPage() {
 
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteMsg, setDeleteMsg] = useState<string | null>(null);
 
   const [schoolQuery, setSchoolQuery] = useState("");
   const [schoolResults, setSchoolResults] = useState<SchoolResult[]>([]);
@@ -179,6 +182,30 @@ export default function AccountPage() {
     if (!client || !userId) return;
     await client.from("school_members").delete().eq("id", membershipId).eq("user_id", userId);
     await loadMemberships();
+  }
+
+  async function deleteAccount() {
+    if (!session?.access_token) return;
+    setDeleteBusy(true);
+    setDeleteMsg(null);
+    try {
+      const res = await fetch("/api/account/delete", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDeleteMsg(data.error ?? "Deletion failed. Please try again.");
+        setDeleteBusy(false);
+        return;
+      }
+      // Account is gone server-side; clear the local session and leave.
+      await signOut();
+      window.location.href = "/";
+    } catch {
+      setDeleteMsg("Network error. Please try again.");
+      setDeleteBusy(false);
+    }
   }
 
   if (!enabled) {
@@ -373,6 +400,51 @@ export default function AccountPage() {
       >
         Sign out
       </button>
+
+      {/* Danger zone — GDPR right to erasure */}
+      <div className="mt-6 rounded-2xl border border-rose-500/20 bg-rose-500/[0.04] p-5">
+        <p className="text-sm font-semibold text-white">Delete account</p>
+        <p className="mt-1 text-xs leading-relaxed text-slate-400">
+          Permanently removes your email, profile, school affiliations, and board posts.
+          Salary and cost-of-living records you submitted are kept but fully anonymized — the
+          link to your identity is severed — so school benchmarks stay useful for other teachers.{" "}
+          <Link href="/privacy" className="text-indigo-300 hover:text-indigo-200">Learn more</Link>
+        </p>
+        {!deleteConfirm ? (
+          <button
+            type="button"
+            onClick={() => setDeleteConfirm(true)}
+            className="mt-3 w-full rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-300 transition hover:bg-rose-500/15"
+          >
+            Delete my account…
+          </button>
+        ) : (
+          <div className="mt-3 space-y-2">
+            <p className="text-xs font-semibold text-rose-300">
+              This cannot be undone. Are you sure?
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={deleteAccount}
+                disabled={deleteBusy}
+                className="flex-1 rounded-xl bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-400 disabled:opacity-50"
+              >
+                {deleteBusy ? "Deleting…" : "Yes, delete permanently"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setDeleteConfirm(false); setDeleteMsg(null); }}
+                disabled={deleteBusy}
+                className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+        {deleteMsg && <p className="mt-2 text-xs text-rose-400">{deleteMsg}</p>}
+      </div>
     </main>
   );
 }

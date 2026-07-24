@@ -31,8 +31,12 @@ export function SiteFooter() {
             </ul>
           </div>
         </div>
-        <div className="mt-8 border-t border-white/[0.04] pt-6 text-xs text-slate-600">
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.04] pt-6 text-xs text-slate-600">
           <p>Staffroom Intel is an independent project, not affiliated with any recruitment agency or school network.</p>
+          <div className="flex items-center gap-4">
+            <Link href="/privacy" className="transition hover:text-slate-300">Privacy</Link>
+            <Link href="/terms" className="transition hover:text-slate-300">Terms</Link>
+          </div>
         </div>
       </div>
     </footer>
