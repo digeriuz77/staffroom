@@ -4,7 +4,6 @@ import { buildSalaryReportAsync, formatUsd } from "@/lib/analysis/salary";
 import { Histogram, StatBar } from "@/components/charts";
 import { SentimentPanel } from "@/components/SentimentPanel";
 import { TanePanel } from "@/components/TanePanel";
-import { WebsiteHealthPanel } from "@/components/WebsiteHealthPanel";
 import { RolePreviewPanel } from "@/components/RolePreviewPanel";
 import { ProvenanceBadge, DataDisclaimer } from "@/components/ProvenanceBadge";
 import { OfferInput } from "@/components/OfferInput";
@@ -14,7 +13,7 @@ import { ContractPackagePanel } from "@/components/ContractPackagePanel";
 import { NegotiationCopilot } from "@/components/NegotiationCopilot";
 import { GoogleAdSlot } from "@/components/GoogleAdSlot";
 import { ArrowIcon } from "@/components/icons";
-import { verdictTone, sentimentTone, TONE_CLASSES, pct } from "@/lib/tone";
+import { verdictTone, TONE_CLASSES, pct } from "@/lib/tone";
 import { getTaxRateForCountry } from "@/lib/db/repo";
 import { getSchoolBrief } from "@/lib/db/interest";
 import type { SchoolBriefRow } from "@/lib/db/types";
@@ -61,22 +60,24 @@ export default async function SchoolReport({ params, searchParams }: {
         ← All schools
       </Link>
 
-      <header className="mb-8">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-          <span className="rounded-md bg-white/5 px-2 py-0.5">{school.country}</span>
-          <span className="rounded-md bg-white/5 px-2 py-0.5">{school.city}</span>
-          <span className="rounded-md bg-white/5 px-2 py-0.5">{school.region}</span>
-          {school.curricula.map((c) => (
-            <span key={c} className="rounded-md bg-indigo-500/10 px-2 py-0.5 text-indigo-300">{c}</span>
-          ))}
+      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <span className="rounded-md bg-white/5 px-2 py-0.5">{school.country}</span>
+            <span className="rounded-md bg-white/5 px-2 py-0.5">{school.city}</span>
+            <span className="rounded-md bg-white/5 px-2 py-0.5">{school.region}</span>
+            {school.curricula.map((c) => (
+              <span key={c} className="rounded-md bg-indigo-500/10 px-2 py-0.5 text-indigo-300">{c}</span>
+            ))}
+          </div>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">{school.name}</h1>
+          <p className="mt-1.5 text-sm text-slate-400">
+            {records.length} real salary record{records.length !== 1 ? "s" : ""}
+            {school.years.length > 0 &&
+              ` · data from ${Math.min(...school.years)}–${Math.max(...school.years)}`}
+          </p>
         </div>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">{school.name}</h1>
-        <p className="mt-2 text-sm text-slate-400">
-          {records.length} real salary record{records.length !== 1 ? "s" : ""}
-          {school.years.length > 0 &&
-            ` · data from ${Math.min(...school.years)}–${Math.max(...school.years)}`}
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-col items-end gap-2 pt-1">
           <CompareButton slug={school.slug} name={school.name} city={school.city} country={school.country} />
           <WatchlistButton slug={school.slug} name={school.name} city={school.city} country={school.country} />
         </div>
@@ -121,18 +122,24 @@ export default async function SchoolReport({ params, searchParams }: {
         <p className="mb-4 text-sm text-slate-400">Net monthly USD across this school&apos;s region</p>
         <Histogram data={histogram} offerValue={offerAnalysis?.offeredMonthlyUsd} />
 
-        <div className="mt-6 space-y-3">
-          {records.length >= 1 && (
-            <StatBar label="This school median" value={schoolStats.median} min={lo} max={hi} highlight />
-          )}
-          <StatBar label={`${school.country} median`} value={countryStats.median} min={lo} max={hi} />
-          <StatBar label={`${school.region} median`} value={regionStats.median} min={lo} max={hi} />
-        </div>
+        <div className="mt-6 grid gap-6 lg:grid-cols-5">
+          {/* Medians — takes more space as the primary visual */}
+          <div className="space-y-3 lg:col-span-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Median comparison</p>
+            {records.length >= 1 && (
+              <StatBar label="This school" value={schoolStats.median} min={lo} max={hi} highlight />
+            )}
+            <StatBar label={school.country} value={countryStats.median} min={lo} max={hi} />
+            <StatBar label={school.region} value={regionStats.median} min={lo} max={hi} />
+          </div>
 
-        <div className="mt-5 grid grid-cols-3 gap-3 border-t border-white/5 pt-5 text-center">
-          <RangeStat label={`${school.country} range`} min={countryStats.min} max={countryStats.max} />
-          <RangeStat label={`${school.country} P25–P75`} min={countryStats.p25} max={countryStats.p75} />
-          <RangeStat label={`${school.region} range`} min={regionStats.min} max={regionStats.max} />
+          {/* Range stats — compact right column */}
+          <div className="space-y-2.5 lg:col-span-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Spread</p>
+            <RangeStat label={`${school.country} full range`} min={countryStats.min} max={countryStats.max} />
+            <RangeStat label={`${school.country} middle 50%`} min={countryStats.p25} max={countryStats.p75} />
+            <RangeStat label={`${school.region} full range`} min={regionStats.min} max={regionStats.max} />
+          </div>
         </div>
 
         <details className="group mt-6 rounded-xl border border-white/10 bg-white/[0.02]">
@@ -160,24 +167,61 @@ export default async function SchoolReport({ params, searchParams }: {
         </details>
       </section>
 
-      {/* 3. Tax Regime & Net Income */}
+      {/* 3. Tax Regime & Cost of Living — unified financial context */}
       <section className="mb-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-        <h2 className="text-xl font-bold text-white">Tax regime</h2>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <span className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-slate-200">
-            {taxRate.taxRegime}
-          </span>
-          <span className="text-2xl font-bold text-emerald-300">
-            {Math.round(taxRate.takeHomePct * 100)}% take-home
-          </span>
-          <span className="text-sm text-slate-500">
-            ~{Math.round(taxRate.effectiveRate * 100)}% effective tax
-            {taxRate.socialInsuranceRate != null && ` + ${Math.round(taxRate.socialInsuranceRate * 100)}% social`}
-          </span>
+        <h2 className="text-xl font-bold text-white">Financial context</h2>
+        <p className="mb-5 text-sm text-slate-400">Tax regime, cost of living &amp; purchasing power</p>
+
+        <div className={`grid gap-5 ${col ? "lg:grid-cols-2" : ""}`}>
+          {/* Left: Tax Regime */}
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">Tax regime</p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-sm font-medium text-slate-200">
+                {taxRate.taxRegime}
+              </span>
+              <span className="text-xl font-bold text-emerald-300">
+                {Math.round(taxRate.takeHomePct * 100)}% take-home
+              </span>
+            </div>
+            <p className="mt-1.5 text-xs text-slate-500">
+              ~{Math.round(taxRate.effectiveRate * 100)}% effective tax
+              {taxRate.socialInsuranceRate != null && ` + ${Math.round(taxRate.socialInsuranceRate * 100)}% social`}
+            </p>
+            {taxRate.specialNotes && (
+              <p className="mt-2.5 border-t border-white/5 pt-2.5 text-xs leading-relaxed text-slate-400">
+                {taxRate.specialNotes}
+              </p>
+            )}
+          </div>
+
+          {/* Right: Cost of Living & Purchasing Power */}
+          {col && (
+            <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/[0.04] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-indigo-300">Cost of living</p>
+                <Link href="/purchasing-power" className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-400 hover:text-indigo-200">
+                  Compare cities <ArrowIcon className="h-3 w-3" />
+                </Link>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">{col.city} · COL index {col.colIndex} (London = 100)</p>
+
+              <div className="mt-3 flex items-baseline gap-2">
+                <p className="text-xl font-bold text-indigo-300">{formatUsd(col.buyingPowerUsd)}</p>
+                <p className="text-xs text-slate-400">/mo median buying power</p>
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <PriceItem label="Milk (1L)" value={col.milk} />
+                <PriceItem label="Beer" value={col.beer} />
+                <PriceItem label="Meal out" value={col.meal} />
+                <PriceItem label="Takeaway" value={col.takeaway} />
+                <PriceItem label="Gym / mo" value={col.gym} />
+                <PriceItem label="Taxi fare" value={col.taxi} />
+              </div>
+            </div>
+          )}
         </div>
-        {taxRate.specialNotes && (
-          <p className="mt-3 text-sm leading-relaxed text-slate-400">{taxRate.specialNotes}</p>
-        )}
       </section>
 
       {/* 4. Teacher Sentiment */}
@@ -185,38 +229,13 @@ export default async function SchoolReport({ params, searchParams }: {
         <SentimentPanel schoolId={school.id} schoolName={school.name} />
       </div>
 
-      {/* 5. Cost of Living & Purchasing Power */}
-      {col && (
-        <section className="mb-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <h2 className="text-xl font-bold text-white">Cost of living &amp; purchasing power</h2>
-          <p className="mb-4 text-sm text-slate-400">{col.city} · COL index {col.colIndex} (London = 100)</p>
-          <div className="mb-4 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.06] p-4 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-xs text-slate-400">Median buying power</p>
-              <p className="text-2xl font-bold text-indigo-300">{formatUsd(col.buyingPowerUsd)}/mo</p>
-            </div>
-            <Link href="/purchasing-power" className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-400 hover:text-indigo-200">
-              Compare cities <ArrowIcon className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <PriceItem label="Milk (1L)" value={col.milk} />
-            <PriceItem label="Beer" value={col.beer} />
-            <PriceItem label="Meal out" value={col.meal} />
-            <PriceItem label="Takeaway" value={col.takeaway} />
-            <PriceItem label="Gym / mo" value={col.gym} />
-            <PriceItem label="Taxi fare" value={col.taxi} />
-          </div>
-        </section>
-      )}
-
-      {/* 6. TANE & Evidence Brief */}
+      {/* 5. Evidence Brief & TANE */}
       {brief && <EvidenceBrief brief={brief} />}
       <div className="mb-8">
         <TanePanel slug={school.slug} offerMonthlyUsd={offerAnalysis?.offeredMonthlyUsd} />
       </div>
 
-      {/* 7. Contract Negotiation Assistant */}
+      {/* 6. Contract Negotiation Assistant */}
       <div className="mb-8">
         <NegotiationCopilot schoolName={school.name} city={school.city} country={school.country} records={records} />
       </div>
@@ -243,17 +262,11 @@ function EvidenceBrief({ brief }: { brief: SchoolBriefRow }) {
         </span>
       </div>
       <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">{brief.summary}</p>
-      <details className="group mt-4 border-t border-white/[0.06] pt-4">
-        <summary className="cursor-pointer list-none text-sm font-medium text-indigo-200">
-          <span className="group-open:hidden">Show evidence-led prompts</span>
-          <span className="hidden group-open:inline">Hide evidence-led prompts</span>
-        </summary>
-        <div className="mt-4 grid gap-5 md:grid-cols-3">
-          <BriefList title="Positive signals" items={brief.strengths} tone="text-emerald-300" />
-          <BriefList title="Watch closely" items={brief.watchouts} tone="text-amber-300" />
-          <BriefList title="Ask the school" items={brief.questions} tone="text-indigo-300" />
-        </div>
-      </details>
+      <div className="mt-4 grid gap-5 border-t border-white/[0.06] pt-4 md:grid-cols-3">
+        <BriefList title="Positive signals" items={brief.strengths} tone="text-emerald-300" />
+        <BriefList title="Watch closely" items={brief.watchouts} tone="text-amber-300" />
+        <BriefList title="Ask the school" items={brief.questions} tone="text-indigo-300" />
+      </div>
       <p className="mt-4 text-[11px] text-slate-500">
         A low-cost agent summarizes patterns, not facts. Verify every claim directly.
       </p>
@@ -301,10 +314,11 @@ function MiniStat({ label, value, sub }: { label: string; value: string; sub: st
 
 function RangeStat({ label, min, max }: { label: string; min: number; max: number }) {
   return (
-    <div>
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-0.5 text-sm font-semibold text-white">{formatUsd(min, true)}</p>
-      <p className="text-xs text-slate-500">to {formatUsd(max, true)}</p>
+    <div className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
+      <span className="text-xs text-slate-400">{label}</span>
+      <span className="text-xs font-semibold text-white">
+        {formatUsd(min, true)}<span className="mx-1 text-slate-600">→</span>{formatUsd(max, true)}
+      </span>
     </div>
   );
 }
