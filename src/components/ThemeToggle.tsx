@@ -8,8 +8,8 @@ export function ThemeToggle() {
   useEffect(() => {
     const saved = localStorage.getItem("staffroom_theme") as "dark" | "light" | null;
     if (saved) {
-      setTheme(saved);
       document.documentElement.setAttribute("data-theme", saved);
+      Promise.resolve().then(() => setTheme(saved));
     }
   }, []);
 

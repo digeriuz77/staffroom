@@ -383,7 +383,10 @@ function WatchedSchoolsList() {
   useEffect(() => {
     try {
       const stored = localStorage.getItem("staffroom_watchlist");
-      if (stored) setList(JSON.parse(stored));
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        Promise.resolve().then(() => setList(parsed));
+      }
     } catch {
       // Ignore errors
     }

@@ -27,7 +27,8 @@ export function WatchlistButton({
       const stored = localStorage.getItem("staffroom_watchlist");
       if (stored) {
         const list: WatchedSchool[] = JSON.parse(stored);
-        setIsWatched(list.some((s) => s.slug === slug));
+        const watched = list.some((s) => s.slug === slug);
+        Promise.resolve().then(() => setIsWatched(watched));
       }
     } catch {
       // Ignore JSON parse errors
