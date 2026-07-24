@@ -62,7 +62,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       enabled: Boolean(client),
       signInWithGoogle: async () => {
         if (!client) return;
-        await client.auth.signInWithOAuth({ provider: "google" });
+        const redirectTo = typeof window !== "undefined" ? `${window.location.origin}` : undefined;
+        const { error } = await client.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo,
+          },
+        });
+        if (error) {
+          console.error("Google sign in error:", error.message);
+        }
       },
       signInWithEmail: async (email) => {
         if (!client) return { error: "Auth not configured" };
