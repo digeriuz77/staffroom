@@ -110,124 +110,120 @@ export default async function SchoolReport({ params, searchParams }: {
           )}
         </div>
       )}
-      {brief && <EvidenceBrief brief={brief} />}
+      {/* 1. Full Compensation Package */}
       <ContractPackagePanel records={records} />
 
-      <NegotiationCopilot schoolName={school.name} city={school.city} country={school.country} records={records} />
       <GoogleAdSlot className="my-6" />
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        <div className="space-y-6 lg:col-span-3">
-          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-            <h2 className="text-lg font-semibold text-white">Salary distribution</h2>
-            <p className="mb-4 text-sm text-slate-400">Net monthly USD across this school&apos;s region</p>
-            <Histogram data={histogram} offerValue={offerAnalysis?.offeredMonthlyUsd} />
+      {/* 2. Salary Distribution */}
+      <section className="mb-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+        <h2 className="text-xl font-bold text-white">Salary distribution</h2>
+        <p className="mb-4 text-sm text-slate-400">Net monthly USD across this school&apos;s region</p>
+        <Histogram data={histogram} offerValue={offerAnalysis?.offeredMonthlyUsd} />
 
-            <div className="mt-6 space-y-3">
-              {records.length >= 1 && (
-                <StatBar label="This school median" value={schoolStats.median} min={lo} max={hi} highlight />
-              )}
-              <StatBar label={`${school.country} median`} value={countryStats.median} min={lo} max={hi} />
-              <StatBar label={`${school.region} median`} value={regionStats.median} min={lo} max={hi} />
-            </div>
-
-            <div className="mt-5 grid grid-cols-3 gap-3 border-t border-white/5 pt-5 text-center">
-              <RangeStat label={`${school.country} range`} min={countryStats.min} max={countryStats.max} />
-              <RangeStat label={`${school.country} P25–P75`} min={countryStats.p25} max={countryStats.p75} />
-              <RangeStat label={`${school.region} range`} min={regionStats.min} max={regionStats.max} />
-            </div>
-          </section>
-
-          <details className="group rounded-2xl border border-white/10 bg-white/[0.03]">
-            <summary className="flex cursor-pointer list-none items-center justify-between p-6 text-lg font-semibold text-white">
-              <span>Salary evidence ({records.length})</span>
-              <span className="text-sm font-normal text-slate-500 group-open:hidden">Show records</span>
-              <span className="hidden text-sm font-normal text-slate-500 group-open:inline">Hide records</span>
-            </summary>
-            <div className="space-y-2 border-t border-white/[0.06] px-6 pb-6 pt-4">
-              {records.slice(0, 12).map((r) => (
-                <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5 text-sm">
-                  <div>
-                    <span className="text-slate-300">{r.role || "Teacher"}</span>
-                    <span className="ml-2 text-xs text-slate-500">{r.year}</span>
-                    <ProvenanceBadge tier={r.trustTier ?? "seed"} />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {r.housing !== "None" && <span className="text-xs text-indigo-300">{r.housing}</span>}
-                    {r.taxRate ? <span className="text-xs text-slate-500">{Math.round(r.taxRate * 100)}% tax</span> : null}
-                    <span className="font-semibold text-white">{formatUsd(r.monthlySalaryUsd)}/mo</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </details>
-
-          <OfferInput slug={school.slug} currentOffer={offerAnalysis?.offeredMonthlyUsd} />
-
-          <TanePanel slug={school.slug} offerMonthlyUsd={offerAnalysis?.offeredMonthlyUsd} />
-
-          <DataDisclaimer />
-        </div>
-
-        <div className="space-y-6 lg:col-span-2">
-          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-            <h2 className="text-lg font-semibold text-white">Tax regime</h2>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <span className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-slate-200">
-                {taxRate.taxRegime}
-              </span>
-              <span className="text-2xl font-bold text-emerald-300">
-                {Math.round(taxRate.takeHomePct * 100)}% take-home
-              </span>
-              <span className="text-sm text-slate-500">
-                ~{Math.round(taxRate.effectiveRate * 100)}% effective tax
-                {taxRate.socialInsuranceRate != null && ` + ${Math.round(taxRate.socialInsuranceRate * 100)}% social`}
-              </span>
-            </div>
-            {taxRate.specialNotes && (
-              <p className="mt-3 text-sm leading-relaxed text-slate-400">{taxRate.specialNotes}</p>
-            )}
-            <p className="mt-2 text-xs text-slate-600">
-              Currency: {taxRate.currency} · Source: {taxRate.country === "Unknown" ? "estimated default" : "researched 2026"}
-            </p>
-          </section>
-
-          {col && (
-            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-              <h2 className="text-lg font-semibold text-white">Cost of living &amp; power</h2>
-              <p className="mb-4 text-sm text-slate-400">{col.city} · COL index {col.colIndex} (London = 100)</p>
-              <div className="mb-4 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.06] p-4">
-                <p className="text-xs text-slate-400">Median buying power</p>
-                <p className="text-2xl font-bold text-indigo-300">{formatUsd(col.buyingPowerUsd)}/mo</p>
-                <p className="text-xs text-slate-500">salary adjusted for local costs</p>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <PriceItem label="Milk (1L)" value={col.milk} />
-                <PriceItem label="Beer" value={col.beer} />
-                <PriceItem label="Meal out" value={col.meal} />
-                <PriceItem label="Takeaway" value={col.takeaway} />
-                <PriceItem label="Gym / mo" value={col.gym} />
-                <PriceItem label="Taxi fare" value={col.taxi} />
-              </div>
-              <Link href="/purchasing-power" className="mt-4 inline-flex items-center gap-1 text-sm text-indigo-300 hover:text-indigo-200">
-                Compare cities <ArrowIcon className="h-3.5 w-3.5" />
-              </Link>
-            </section>
+        <div className="mt-6 space-y-3">
+          {records.length >= 1 && (
+            <StatBar label="This school median" value={schoolStats.median} min={lo} max={hi} highlight />
           )}
-
-          <SentimentPanel schoolId={school.id} schoolName={school.name} />
-
-          <details className="group">
-            <summary className="cursor-pointer list-none rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm font-medium text-slate-300 transition hover:border-white/20 hover:text-white">
-              <span className="group-open:hidden">Open website and research checks</span>
-              <span className="hidden group-open:inline">Hide website and research checks</span>
-            </summary>
-            <div className="mt-3">
-              <WebsiteHealthPanel schoolName={school.name} city={school.city} country={school.country} />
-            </div>
-          </details>
+          <StatBar label={`${school.country} median`} value={countryStats.median} min={lo} max={hi} />
+          <StatBar label={`${school.region} median`} value={regionStats.median} min={lo} max={hi} />
         </div>
+
+        <div className="mt-5 grid grid-cols-3 gap-3 border-t border-white/5 pt-5 text-center">
+          <RangeStat label={`${school.country} range`} min={countryStats.min} max={countryStats.max} />
+          <RangeStat label={`${school.country} P25–P75`} min={countryStats.p25} max={countryStats.p75} />
+          <RangeStat label={`${school.region} range`} min={regionStats.min} max={regionStats.max} />
+        </div>
+
+        <details className="group mt-6 rounded-xl border border-white/10 bg-white/[0.02]">
+          <summary className="flex cursor-pointer list-none items-center justify-between p-4 text-sm font-semibold text-white">
+            <span>View all verified salary records ({records.length})</span>
+            <span className="text-xs font-normal text-slate-400 group-open:hidden">Show records ›</span>
+            <span className="hidden text-xs font-normal text-slate-400 group-open:inline">Hide records ‹</span>
+          </summary>
+          <div className="space-y-2 border-t border-white/[0.06] p-4">
+            {records.slice(0, 15).map((r) => (
+              <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5 text-sm">
+                <div>
+                  <span className="text-slate-300">{r.role || "Teacher"}</span>
+                  <span className="ml-2 text-xs text-slate-500">{r.year}</span>
+                  <ProvenanceBadge tier={r.trustTier ?? "seed"} />
+                </div>
+                <div className="flex items-center gap-3">
+                  {r.housing !== "None" && <span className="text-xs text-indigo-300">{r.housing}</span>}
+                  {r.taxRate ? <span className="text-xs text-slate-500">{Math.round(r.taxRate * 100)}% tax</span> : null}
+                  <span className="font-semibold text-white">{formatUsd(r.monthlySalaryUsd)}/mo</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
+      </section>
+
+      {/* 3. Tax Regime & Net Income */}
+      <section className="mb-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+        <h2 className="text-xl font-bold text-white">Tax regime</h2>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <span className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-slate-200">
+            {taxRate.taxRegime}
+          </span>
+          <span className="text-2xl font-bold text-emerald-300">
+            {Math.round(taxRate.takeHomePct * 100)}% take-home
+          </span>
+          <span className="text-sm text-slate-500">
+            ~{Math.round(taxRate.effectiveRate * 100)}% effective tax
+            {taxRate.socialInsuranceRate != null && ` + ${Math.round(taxRate.socialInsuranceRate * 100)}% social`}
+          </span>
+        </div>
+        {taxRate.specialNotes && (
+          <p className="mt-3 text-sm leading-relaxed text-slate-400">{taxRate.specialNotes}</p>
+        )}
+      </section>
+
+      {/* 4. Teacher Sentiment */}
+      <div className="mb-8">
+        <SentimentPanel schoolId={school.id} schoolName={school.name} />
       </div>
+
+      {/* 5. Cost of Living & Purchasing Power */}
+      {col && (
+        <section className="mb-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+          <h2 className="text-xl font-bold text-white">Cost of living &amp; purchasing power</h2>
+          <p className="mb-4 text-sm text-slate-400">{col.city} · COL index {col.colIndex} (London = 100)</p>
+          <div className="mb-4 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.06] p-4 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs text-slate-400">Median buying power</p>
+              <p className="text-2xl font-bold text-indigo-300">{formatUsd(col.buyingPowerUsd)}/mo</p>
+            </div>
+            <Link href="/purchasing-power" className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-400 hover:text-indigo-200">
+              Compare cities <ArrowIcon className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <PriceItem label="Milk (1L)" value={col.milk} />
+            <PriceItem label="Beer" value={col.beer} />
+            <PriceItem label="Meal out" value={col.meal} />
+            <PriceItem label="Takeaway" value={col.takeaway} />
+            <PriceItem label="Gym / mo" value={col.gym} />
+            <PriceItem label="Taxi fare" value={col.taxi} />
+          </div>
+        </section>
+      )}
+
+      {/* 6. TANE & Evidence Brief */}
+      {brief && <EvidenceBrief brief={brief} />}
+      <div className="mb-8">
+        <TanePanel slug={school.slug} offerMonthlyUsd={offerAnalysis?.offeredMonthlyUsd} />
+      </div>
+
+      {/* 7. Contract Negotiation Assistant */}
+      <div className="mb-8">
+        <NegotiationCopilot schoolName={school.name} city={school.city} country={school.country} records={records} />
+      </div>
+
+      <OfferInput slug={school.slug} currentOffer={offerAnalysis?.offeredMonthlyUsd} />
+
+      <DataDisclaimer />
     </main>
   );
 }
